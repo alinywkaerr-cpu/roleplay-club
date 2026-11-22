@@ -102,41 +102,172 @@ document.getElementById('lock').style.display='none';
 document.getElementById('home').style.display='block';
 }
 function closeApp(){
-document.getElementById('panel').style.display='none';
+  document.getElementById("panel").style.display = "none";
 }
-function openApp(name){
-const content=document.getElementById('panelContent');
-const panel=document.getElementById('panel');
-const titles={chats:'Сообщения 💬',characters:'Персонажи 🎭',social:'Pinkstagram 📸',gallery:'Галерея 🌷',music:'Melody 🎧',diary:'Дневник 📔',contacts:'Контакты 👥',settings:'Настройки ⚙️'};
-let html='<h2>'+titles[name]+'</h2>';
-if(name==='characters'){
-html+='<p class="note">Твои истории начинаются здесь. Выбери персонажа.</p>';
-characters.forEach(c=>html+='<div class="item chat"><div class="avatar">'+c[2]+'</div><div><strong>'+c[0]+'</strong><small>'+c[1]+'</small></div></div>');
+
+let chatCharacter = null;
+let chatHistories = {};
+
+try {
+  chatHistories = JSON.parse(localStorage.getItem("roleplay_chats") || "{}");
+} catch (e) {
+  chatHistories = {};
 }
-else if(name==='chats'){
-html+='<div class="item"><strong>Твои переписки</strong><p class="note">Здесь будут личные и групповые ролевые чаты.</p></div><p class="note">Скоро добавим настоящие диалоги с ИИ и сохранение истории.</p>';
+
+function saveChats() {
+  localStorage.setItem("roleplay_chats", JSON.stringify(chatHistories));
 }
-else if(name==='social'){
-html+='<div class="item"><strong>Твоя лента ♡</strong><p class="note">Здесь появятся публикации, истории, лайки и профили персонажей.</p></div>';
+
+function escapeHTML(value) {
+  return String(value).replace(/[&<>"']/g, char => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#039;"
+  })[char]);
 }
-else if(name==='gallery'){
-html+='<div class="item"><strong>Мои фотографии</strong><p class="note">Здесь будут храниться изображения из твоих чатов и альбомы.</p></div>';
+
+function openApp(name) {
+  const content = document.getElementById("panelContent");
+  const panel = document.getElementById("panel");
+
+  const titles = {
+    chats: "Сообщения 💬",
+    characters: "Персонажи 🎭",
+    social: "Pinkstagram 📸",
+    gallery: "Галерея 🌷",
+    music: "Melody 🎧",
+    diary: "Дневник 📔",
+    contacts: "Контакты 👥",
+    settings: "Настройки ⚙️"
+  };
+
+  let html = '<h2>' + titles[name] + '</h2>';
+
+  if (name === "characters" || name === "chats") {
+    html += '<p class="note">Выбери персонажа, чтобы начать историю ♡</p>';
+
+    characters.forEach((c, i) => {
+      html += `
+        <button class="item chat" style="width:100%;text-align:left;border:0;cursor:pointer"
+          onclick="startChat(${i})">
+          <div class="avatar">${c[2]}</div>
+          <div>
+            <strong>${escapeHTML(c[0])}</strong>
+            <small>${escapeHTML(c[1])}</small>
+          </div>
+        </button>`;
+    });
+  } else {
+    html += '<div class="item"><strong>Скоро здесь появится больше возможностей ♡</strong><p class="note">Мы постепенно создаём это приложение.</p></div>';
+  }
+
+  content.innerHTML = html;
+  panel.style.display = "block";
 }
-else if(name==='music'){
-html+='<div class="item"><strong>Твоя музыка ♫</strong><p class="note">Позже добавим музыкальный плеер с поддержкой легальных музыкальных сервисов.</p></div>';
+
+function startChat(index) {
+  chatCharacter = characters[index];
+
+  if (!chatHistories[chatCharacter[0]]) {
+    chatHistories[chatCharacter[0]] = [];
+  }
+
+  renderChat();
 }
-else if(name==='diary'){
-html+='<div class="item"><strong>Личные записи</strong><p class="note">Твоё место для мыслей, заметок и сюжетов.</p></div>';
+
+function renderChat() {
+  const content = document.getElementById("panelContent");
+  const history = chatHistories[chatCharacter[0]] || [];
+
+  let html = `
+    <button class="back" onclick="openApp('characters')">← К персонажам</button>
+    <h2>${escapeHTML(chatCharacter[0])} ${chatCharacter[2]}</h2>
+    <p class="note">${escapeHTML(chatCharacter[1])}</p>
+    <div id="chatMessages" style="display:flex;flex-direction:column;gap:12px;margin:20px 0">
+  `;
+
+  history.forEach(message => {
+    const mine = message.role === "user";
+    html += `
+      <div style="
+        align-self:${mine ? "flex-end" : "flex-start"};
+        background:${mine ? "#f2d5e3" : "#fff"};
+        border-radius:18px;padding:12px 15px;
+        max-width:85%;white-space:pre-wrap;overflow-wrap:anywhere">
+        ${escapeHTML(message.content)}
+      </div>`;
+  });
+
+  html += `
+    </div>
+    <form onsubmit="sendChat(event)" style="display:flex;gap:8px;position:sticky;bottom:0;background:#fff8fc;padding:10px 0">
+      <input id="chatInput" placeholder="Напиши сообщение..." autocomplete="off"
+        style="min-width:0;flex:1;border:1px solid #e6c5d7;border-radius:22px;padding:13px">
+      <button type="submit" id="sendButton"
+        style="background:#e9c4d8;color:#583b4e;border-radius:22px;padding:0 17px">➤</button>
+    </form>
+    <p class="note" id="chatStatus"></p>
+  `;
+
+  content.innerHTML = html;
+  const box = document.getElementById("panel");
+  box.scrollTop = box.scrollHeight;
 }
-else if(name==='contacts'){
-html+='<div class="item"><strong>Твои контакты</strong><p class="note">Здесь будут собраны персонажи и друзья.</p></div>';
+
+async function sendChat(event) {
+  event.preventDefault();
+
+  const input = document.getElementById("chatInput");
+  const button = document.getElementById("sendButton");
+  const status = document.getElementById("chatStatus");
+  const message = input.value.trim();
+
+  if (!message || !chatCharacter) return;
+
+  const history = chatHistories[chatCharacter[0]];
+  history.push({ role: "user", content: message });
+
+  saveChats();
+  renderChat();
+
+  const send = document.getElementById("sendButton");
+  const field = document.getElementById("chatInput");
+  send.disabled = true;
+  field.disabled = true;
+
+  document.getElementById("chatStatus").textContent = "Персонаж печатает... 💭";
+
+  try {
+    const response = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        character: chatCharacter[0],
+        messages: history.slice(-30)
+      })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || "Ошибка сервера");
+    }
+
+    history.push({ role: "assistant", content: data.reply });
+    saveChats();
+    renderChat();
+
+  } catch (error) {
+    history.pop();
+    saveChats();
+    renderChat();
+    document.getElementById("chatStatus").textContent =
+      "Не удалось получить ответ: " + error.message;
+  }
 }
-else if(name==='settings'){
-html+='<div class="item"><strong>Оформление</strong><p class="note">Сейчас действует розовая тема. Настройку обоев добавим позже.</p></div><div class="item"><strong>Roleplay Club</strong><p class="note">Твоя собственная виртуальная вселенная ♡</p></div>';
-}
-content.innerHTML=html;
-panel.style.display='block';
-}
+
 </script>
 </body>
 </html>
