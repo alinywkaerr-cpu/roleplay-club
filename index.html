@@ -1,0 +1,142 @@
+
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#f8dce8">
+<title>Roleplay Club</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f5dce8;color:#493744}
+button{font:inherit;border:0;cursor:pointer}
+.phone{min-height:100vh;max-width:480px;margin:auto;background:linear-gradient(145deg,#fce8f0,#e9c9dc);position:relative;overflow:hidden}
+.status{height:35px;padding:12px 24px 0;display:flex;justify-content:space-between;font-size:12px;font-weight:700}
+.screen{padding:24px 22px 35px;min-height:calc(100vh - 35px)}
+.lock{min-height:calc(100vh - 70px);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;background:radial-gradient(circle at 50% 35%,#fff5fa,#e9c4d8 75%)}
+.lock .date{font-size:17px;color:#805b73}
+.clock{font-size:76px;font-weight:200;letter-spacing:-4px;margin:5px 0 30px}
+.lock h1{font-size:27px;font-weight:600}
+.lock p{color:#805b73}
+.unlock{background:#fff7fb;color:#895b78;border-radius:30px;padding:14px 28px;margin-top:45px;box-shadow:0 5px 18px #b7839d44}
+.home{display:none}
+.greeting{font-size:25px;font-weight:650;margin:18px 0 5px}
+.subtitle{color:#926e83;font-size:13px;margin-bottom:25px}
+.widget{background:#ffffffa8;border:1px solid #fff9;border-radius:22px;padding:17px;margin-bottom:25px;box-shadow:0 8px 25px #b7839d20}
+.widget strong{font-size:14px}
+.widget p{font-size:13px;color:#88677c;margin:7px 0 0}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:23px 10px}
+.app{display:flex;flex-direction:column;align-items:center;gap:7px;background:none;color:#513e4c;font-size:11px}
+.app-icon{width:58px;height:58px;border-radius:19px;background:linear-gradient(145deg,#fff,#f4d3e3);display:grid;place-items:center;font-size:27px;box-shadow:0 5px 13px #9d6d8933}
+.dock{position:sticky;bottom:14px;margin:35px 0 0;padding:13px;background:#ffffff80;border:1px solid #fff9;border-radius:25px;display:flex;justify-content:space-around;backdrop-filter:blur(15px)}
+.dock button{background:none;font-size:27px}
+.panel{display:none;position:absolute;inset:35px 0 0;background:#fff8fc;padding:22px;overflow:auto;border-radius:25px 25px 0 0}
+.panel h2{margin:8px 0 20px}
+.back{background:#f3dce8;color:#805b73;padding:9px 15px;border-radius:20px;margin-bottom:15px}
+.item{padding:15px;background:#fff;border-radius:17px;margin:10px 0;box-shadow:0 3px 12px #9d6d8910}
+.item small{display:block;color:#997b8d;margin-top:5px}
+.chat{display:flex;gap:10px;align-items:center}
+.avatar{width:43px;height:43px;border-radius:50%;background:#f4d9e7;display:grid;place-items:center;font-size:21px}
+.note{font-size:13px;color:#96778a;line-height:1.5}
+</style>
+</head>
+<body>
+<div class="phone">
+<div class="status"><span>9:41</span><span>●●●  Wi-Fi  ▰</span></div>
+
+<section class="screen lock" id="lock">
+<div class="date" id="date"></div>
+<div class="clock" id="clock">09:41</div>
+<h1>Roleplay Club</h1>
+<p>Твой маленький виртуальный мир ♡</p>
+<button class="unlock" onclick="unlock()">Разблокировать →</button>
+</section>
+
+<section class="screen home" id="home">
+<div class="greeting">Привет, дорогая ♡</div>
+<div class="subtitle">Добро пожаловать в твой мир</div>
+<div class="widget">
+<strong>✧ ТВОЁ ПРОСТРАНСТВО</strong>
+<p>Здесь начинаются истории, знакомства и приключения.</p>
+</div>
+<div class="grid">
+<button class="app" onclick="openApp('chats')"><span class="app-icon">💬</span>Сообщения</button>
+<button class="app" onclick="openApp('characters')"><span class="app-icon">🎭</span>Персонажи</button>
+<button class="app" onclick="openApp('social')"><span class="app-icon">📸</span>Pinkstagram</button>
+<button class="app" onclick="openApp('gallery')"><span class="app-icon">🌷</span>Галерея</button>
+<button class="app" onclick="openApp('music')"><span class="app-icon">🎧</span>Melody</button>
+<button class="app" onclick="openApp('diary')"><span class="app-icon">📔</span>Дневник</button>
+<button class="app" onclick="openApp('contacts')"><span class="app-icon">👥</span>Контакты</button>
+<button class="app" onclick="openApp('settings')"><span class="app-icon">⚙️</span>Настройки</button>
+</div>
+<div class="dock">
+<button onclick="openApp('chats')">💬</button>
+<button onclick="openApp('social')">📸</button>
+<button onclick="openApp('gallery')">🖼️</button>
+<button onclick="openApp('settings')">⚙️</button>
+</div>
+</section>
+
+<section class="panel" id="panel">
+<button class="back" onclick="closeApp()">← На главный экран</button>
+<div id="panelContent"></div>
+</section>
+</div>
+
+<script>
+const characters=[
+["Натаниэль Говард","Тени Сентфора 2","🖤"],
+["Надин","Тени Сентфора 2","🌹"],
+["Декс","Тени Сентфора 2","⭐"],
+["Руди","Тени Сентфора 2","🌙"],
+["BB","Big Bad Dogs","🐾"]
+];
+function updateTime(){
+const now=new Date();
+document.getElementById('clock').textContent=now.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});
+document.getElementById('date').textContent=now.toLocaleDateString('ru-RU',{weekday:'long',day:'numeric',month:'long'});
+}
+updateTime();setInterval(updateTime,10000);
+function unlock(){
+document.getElementById('lock').style.display='none';
+document.getElementById('home').style.display='block';
+}
+function closeApp(){
+document.getElementById('panel').style.display='none';
+}
+function openApp(name){
+const content=document.getElementById('panelContent');
+const panel=document.getElementById('panel');
+const titles={chats:'Сообщения 💬',characters:'Персонажи 🎭',social:'Pinkstagram 📸',gallery:'Галерея 🌷',music:'Melody 🎧',diary:'Дневник 📔',contacts:'Контакты 👥',settings:'Настройки ⚙️'};
+let html='<h2>'+titles[name]+'</h2>';
+if(name==='characters'){
+html+='<p class="note">Твои истории начинаются здесь. Выбери персонажа.</p>';
+characters.forEach(c=>html+='<div class="item chat"><div class="avatar">'+c[2]+'</div><div><strong>'+c[0]+'</strong><small>'+c[1]+'</small></div></div>');
+}
+else if(name==='chats'){
+html+='<div class="item"><strong>Твои переписки</strong><p class="note">Здесь будут личные и групповые ролевые чаты.</p></div><p class="note">Скоро добавим настоящие диалоги с ИИ и сохранение истории.</p>';
+}
+else if(name==='social'){
+html+='<div class="item"><strong>Твоя лента ♡</strong><p class="note">Здесь появятся публикации, истории, лайки и профили персонажей.</p></div>';
+}
+else if(name==='gallery'){
+html+='<div class="item"><strong>Мои фотографии</strong><p class="note">Здесь будут храниться изображения из твоих чатов и альбомы.</p></div>';
+}
+else if(name==='music'){
+html+='<div class="item"><strong>Твоя музыка ♫</strong><p class="note">Позже добавим музыкальный плеер с поддержкой легальных музыкальных сервисов.</p></div>';
+}
+else if(name==='diary'){
+html+='<div class="item"><strong>Личные записи</strong><p class="note">Твоё место для мыслей, заметок и сюжетов.</p></div>';
+}
+else if(name==='contacts'){
+html+='<div class="item"><strong>Твои контакты</strong><p class="note">Здесь будут собраны персонажи и друзья.</p></div>';
+}
+else if(name==='settings'){
+html+='<div class="item"><strong>Оформление</strong><p class="note">Сейчас действует розовая тема. Настройку обоев добавим позже.</p></div><div class="item"><strong>Roleplay Club</strong><p class="note">Твоя собственная виртуальная вселенная ♡</p></div>';
+}
+content.innerHTML=html;
+panel.style.display='block';
+}
+</script>
+</body>
+</html>
