@@ -1,4 +1,5 @@
 
+
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -9,7 +10,8 @@
 <style>
 *{box-sizing:border-box}
 body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f5dce8;color:#493744}
-button{font:inherit;border:0;cursor:pointer}
+button,input,textarea{font:inherit}
+button{border:0;cursor:pointer}
 .phone{min-height:100vh;max-width:480px;margin:auto;background:linear-gradient(145deg,#fce8f0,#e9c9dc);position:relative;overflow:hidden}
 .status{height:35px;padding:12px 24px 0;display:flex;justify-content:space-between;font-size:12px;font-weight:700}
 .screen{padding:24px 22px 35px;min-height:calc(100vh - 35px)}
@@ -30,19 +32,31 @@ button{font:inherit;border:0;cursor:pointer}
 .app-icon{width:58px;height:58px;border-radius:19px;background:linear-gradient(145deg,#fff,#f4d3e3);display:grid;place-items:center;font-size:27px;box-shadow:0 5px 13px #9d6d8933}
 .dock{position:sticky;bottom:14px;margin:35px 0 0;padding:13px;background:#ffffff80;border:1px solid #fff9;border-radius:25px;display:flex;justify-content:space-around;backdrop-filter:blur(15px)}
 .dock button{background:none;font-size:27px}
-.panel{display:none;position:absolute;inset:35px 0 0;background:#fff8fc;padding:22px;overflow:auto;border-radius:25px 25px 0 0}
-.panel h2{margin:8px 0 20px}
-.back{background:#f3dce8;color:#805b73;padding:9px 15px;border-radius:20px;margin-bottom:15px}
-.item{padding:15px;background:#fff;border-radius:17px;margin:10px 0;box-shadow:0 3px 12px #9d6d8910}
+.panel{display:none;position:absolute;inset:35px 0 0;background:#fff8fc;padding:18px;overflow:auto;border-radius:25px 25px 0 0}
+.panel h2{margin:8px 0 16px}
+.back{background:#f3dce8;color:#805b73;padding:9px 15px;border-radius:20px;margin-bottom:12px}
+.item{padding:14px;background:#fff;border-radius:17px;margin:9px 0;box-shadow:0 3px 12px #9d6d8910}
 .item small{display:block;color:#997b8d;margin-top:5px}
 .chat{display:flex;gap:10px;align-items:center}
-.avatar{width:43px;height:43px;border-radius:50%;background:#f4d9e7;display:grid;place-items:center;font-size:21px}
+.avatar{width:43px;height:43px;flex-shrink:0;border-radius:50%;background:#f4d9e7;display:grid;place-items:center;font-size:21px}
 .note{font-size:13px;color:#96778a;line-height:1.5}
+.action{background:#f5e4ed;color:#805b73;border-radius:15px;padding:10px 12px;margin:3px;font-size:13px}
+.primary{background:#e9c4d8;color:#583b4e;border-radius:18px;padding:12px 15px}
+.field{width:100%;border:1px solid #e6c5d7;border-radius:15px;padding:12px;background:white;color:#493744;margin:6px 0}
+.message{max-width:88%;padding:12px 14px;border-radius:18px;white-space:pre-wrap;overflow-wrap:anywhere;position:relative}
+.mine{align-self:flex-end;background:#f2d5e3}
+.theirs{align-self:flex-start;background:white}
+.message-tools{display:flex;gap:4px;flex-wrap:wrap;margin-top:5px}
+.message-tools button{font-size:11px;padding:6px 8px;border-radius:10px;background:#f8eaf1;color:#805b73}
+#chatMessages{display:flex;flex-direction:column;gap:10px;margin:16px 0}
+.composer{display:flex;gap:7px;position:sticky;bottom:0;background:#fff8fc;padding:10px 0}
+.composer input{min-width:0;flex:1;border:1px solid #e6c5d7;border-radius:22px;padding:12px}
+.row{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
 </style>
 </head>
 <body>
 <div class="phone">
-<div class="status"><span>9:41</span><span>●●●  Wi-Fi  ▰</span></div>
+<div class="status"><span>9:41</span><span>●●● Wi-Fi ▰</span></div>
 
 <section class="screen lock" id="lock">
 <div class="date" id="date"></div>
@@ -55,10 +69,7 @@ button{font:inherit;border:0;cursor:pointer}
 <section class="screen home" id="home">
 <div class="greeting">Привет, дорогая ♡</div>
 <div class="subtitle">Добро пожаловать в твой мир</div>
-<div class="widget">
-<strong>✧ ТВОЁ ПРОСТРАНСТВО</strong>
-<p>Здесь начинаются истории, знакомства и приключения.</p>
-</div>
+<div class="widget"><strong>✧ ТВОЁ ПРОСТРАНСТВО</strong><p>Здесь начинаются истории, знакомства и приключения.</p></div>
 <div class="grid">
 <button class="app" onclick="openApp('chats')"><span class="app-icon">💬</span>Сообщения</button>
 <button class="app" onclick="openApp('characters')"><span class="app-icon">🎭</span>Персонажи</button>
@@ -91,183 +102,250 @@ const characters=[
 ["Руди","Тени Сентфора 2","🌙"],
 ["BB","Big Bad Dogs","🐾"]
 ];
+
 function updateTime(){
 const now=new Date();
 document.getElementById('clock').textContent=now.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});
 document.getElementById('date').textContent=now.toLocaleDateString('ru-RU',{weekday:'long',day:'numeric',month:'long'});
 }
 updateTime();setInterval(updateTime,10000);
+
 function unlock(){
 document.getElementById('lock').style.display='none';
 document.getElementById('home').style.display='block';
 }
-function closeApp(){
-  document.getElementById("panel").style.display = "none";
+function closeApp(){document.getElementById("panel").style.display="none";}
+
+function escapeHTML(value){
+return String(value).replace(/[&<>"']/g,char=>({
+"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
+})[char]);
 }
 
-let chatCharacter = null;
-let chatHistories = {};
+let chats=[];
+let activeChatId=null;
+let busy=false;
 
-try {
-  chatHistories = JSON.parse(localStorage.getItem("roleplay_chats") || "{}");
-} catch (e) {
-  chatHistories = {};
+try{
+chats=JSON.parse(localStorage.getItem("roleplay_conversations")||"[]");
+if(!Array.isArray(chats))chats=[];
+}catch(e){chats=[];}
+
+function saveChats(){
+localStorage.setItem("roleplay_conversations",JSON.stringify(chats));
 }
 
-function saveChats() {
-  localStorage.setItem("roleplay_chats", JSON.stringify(chatHistories));
+function makeId(){
+return Date.now().toString(36)+Math.random().toString(36).slice(2,8);
 }
 
-function escapeHTML(value) {
-  return String(value).replace(/[&<>"']/g, char => ({
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    '"': "&quot;",
-    "'": "&#039;"
-  })[char]);
+/* Перенос старых переписок */
+try{
+const old=JSON.parse(localStorage.getItem("roleplay_chats")||"{}");
+for(const name in old){
+if(Array.isArray(old[name])&&!chats.some(c=>c.title===name)){
+chats.push({
+id:makeId(),title:name,type:"private",
+participants:[name],messages:old[name],memory:""
+});
+}
+}
+saveChats();
+}catch(e){}
+
+function getChat(){
+return chats.find(c=>c.id===activeChatId);
 }
 
-function openApp(name) {
-  const content = document.getElementById("panelContent");
-  const panel = document.getElementById("panel");
+function openApp(name){
+const content=document.getElementById("panelContent");
+const panel=document.getElementById("panel");
+const titles={
+chats:"Сообщения 💬",characters:"Персонажи 🎭",
+social:"Pinkstagram 📸",gallery:"Галерея 🌷",
+music:"Melody 🎧",diary:"Дневник 📔",
+contacts:"Контакты 👥",settings:"Настройки ⚙️"
+};
+let html="<h2>"+titles[name]+"</h2>";
 
-  const titles = {
-    chats: "Сообщения 💬",
-    characters: "Персонажи 🎭",
-    social: "Pinkstagram 📸",
-    gallery: "Галерея 🌷",
-    music: "Melody 🎧",
-    diary: "Дневник 📔",
-    contacts: "Контакты 👥",
-    settings: "Настройки ⚙️"
-  };
-
-  let html = '<h2>' + titles[name] + '</h2>';
-
-  if (name === "characters" || name === "chats") {
-    html += '<p class="note">Выбери персонажа, чтобы начать историю ♡</p>';
-
-    characters.forEach((c, i) => {
-      html += `
-        <button class="item chat" style="width:100%;text-align:left;border:0;cursor:pointer"
-          onclick="startChat(${i})">
-          <div class="avatar">${c[2]}</div>
-          <div>
-            <strong>${escapeHTML(c[0])}</strong>
-            <small>${escapeHTML(c[1])}</small>
-          </div>
-        </button>`;
-    });
-  } else {
-    html += '<div class="item"><strong>Скоро здесь появится больше возможностей ♡</strong><p class="note">Мы постепенно создаём это приложение.</p></div>';
-  }
-
-  content.innerHTML = html;
-  panel.style.display = "block";
+if(name==="chats"){
+html+=`<button class="primary" onclick="chooseNewChat()">＋ Новый чат</button>
+<div class="row" style="margin-top:14px">
+<button class="action" onclick="chooseNewChat()">Личный чат</button>
+<button class="action" onclick="chooseGroup()">Групповой чат</button>
+</div><div style="margin-top:12px">`;
+if(!chats.length)html+='<p class="note">Пока здесь пусто. Создай свою первую переписку ♡</p>';
+chats.slice().reverse().forEach(c=>{
+html+=`<div class="item chat">
+<button style="background:none;text-align:left;flex:1;color:inherit" onclick="openChat('${c.id}')">
+<strong>${escapeHTML(c.title)}</strong>
+<small>${c.type==="group"?"Групповой чат":"Личная переписка"} · ${c.messages.length} сообщений</small>
+</button>
+<button class="action" onclick="renameChat('${c.id}')">✏️</button>
+<button class="action" onclick="deleteChat('${c.id}')">🗑️</button>
+</div>`;
+});
+html+="</div>";
 }
 
-function startChat(index) {
-  chatCharacter = characters[index];
-
-  if (!chatHistories[chatCharacter[0]]) {
-    chatHistories[chatCharacter[0]] = [];
-  }
-
-  renderChat();
+if(name==="characters"){
+html+='<p class="note">Выбери персонажа, чтобы начать новую историю ♡</p>';
+characters.forEach((c,i)=>{
+html+=`<button class="item chat" style="width:100%;text-align:left" onclick="createPrivate(${i})">
+<div class="avatar">${c[2]}</div><div><strong>${escapeHTML(c[0])}</strong><small>${escapeHTML(c[1])}</small></div></button>`;
+});
+html+='<button class="primary" onclick="openApp(\'chats\')">Мои переписки</button>';
 }
 
-function renderChat() {
-  const content = document.getElementById("panelContent");
-  const history = chatHistories[chatCharacter[0]] || [];
-
-  let html = `
-    <button class="back" onclick="openApp('characters')">← К персонажам</button>
-    <h2>${escapeHTML(chatCharacter[0])} ${chatCharacter[2]}</h2>
-    <p class="note">${escapeHTML(chatCharacter[1])}</p>
-    <div id="chatMessages" style="display:flex;flex-direction:column;gap:12px;margin:20px 0">
-  `;
-
-  history.forEach(message => {
-    const mine = message.role === "user";
-    html += `
-      <div style="
-        align-self:${mine ? "flex-end" : "flex-start"};
-        background:${mine ? "#f2d5e3" : "#fff"};
-        border-radius:18px;padding:12px 15px;
-        max-width:85%;white-space:pre-wrap;overflow-wrap:anywhere">
-        ${escapeHTML(message.content)}
-      </div>`;
-  });
-
-  html += `
-    </div>
-    <form onsubmit="sendChat(event)" style="display:flex;gap:8px;position:sticky;bottom:0;background:#fff8fc;padding:10px 0">
-      <input id="chatInput" placeholder="Напиши сообщение..." autocomplete="off"
-        style="min-width:0;flex:1;border:1px solid #e6c5d7;border-radius:22px;padding:13px">
-      <button type="submit" id="sendButton"
-        style="background:#e9c4d8;color:#583b4e;border-radius:22px;padding:0 17px">➤</button>
-    </form>
-    <p class="note" id="chatStatus"></p>
-  `;
-
-  content.innerHTML = html;
-  const box = document.getElementById("panel");
-  box.scrollTop = box.scrollHeight;
+if(!["chats","characters"].includes(name)){
+html+='<div class="item"><strong>Скоро здесь появится больше возможностей ♡</strong><p class="note">Мы постепенно создаём это приложение.</p></div>';
+}
+content.innerHTML=html;
+panel.style.display="block";
 }
 
-async function sendChat(event) {
-  event.preventDefault();
-
-  const input = document.getElementById("chatInput");
-  const button = document.getElementById("sendButton");
-  const status = document.getElementById("chatStatus");
-  const message = input.value.trim();
-
-  if (!message || !chatCharacter) return;
-
-  const history = chatHistories[chatCharacter[0]];
-  history.push({ role: "user", content: message });
-
-  saveChats();
-  renderChat();
-
-  const send = document.getElementById("sendButton");
-  const field = document.getElementById("chatInput");
-  send.disabled = true;
-  field.disabled = true;
-
-  document.getElementById("chatStatus").textContent = "Персонаж печатает... 💭";
-
-  try {
-    const response = await fetch("/api/chat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        character: chatCharacter[0],
-        messages: history.slice(-30)
-      })
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(data.error || "Ошибка сервера");
-    }
-
-    history.push({ role: "assistant", content: data.reply });
-    saveChats();
-    renderChat();
-
-  } catch (error) {
-    history.pop();
-    saveChats();
-    renderChat();
-    document.getElementById("chatStatus").textContent =
-      "Не удалось получить ответ: " + error.message;
-  }
+function chooseNewChat(){
+openApp("characters");
 }
 
+function chooseGroup(){
+let html='<h2>Новый групповой чат 💬</h2><p class="note">Выбери участников группы.</p>';
+characters.forEach((c,i)=>{
+html+=`<label class="item" style="display:block"><input type="checkbox" class="groupChoice" value="${i}"> ${c[2]} ${escapeHTML(c[0])}</label>`;
+});
+html+='<input class="field" id="groupName" placeholder="Название группового чата">';
+html+='<button class="primary" onclick="createGroup()">Создать группу</button>';
+document.getElementById("panelContent").innerHTML=html;
+}
+
+function createGroup(){
+const selected=[...document.querySelectorAll(".groupChoice:checked")].map(x=>Number(x.value));
+if(selected.length<2){alert("Выбери хотя бы двух персонажей");return;}
+const names=selected.map(i=>characters[i][0]);
+const title=document.getElementById("groupName").value.trim()||names.join(", ");
+const chat={id:makeId(),title,type:"group",participants:names,messages:[],memory:""};
+chats.push(chat);saveChats();activeChatId=chat.id;renderChat();
+}
+
+function createPrivate(index){
+const c=characters[index];
+const chat={id:makeId(),title:c[0],type:"private",participants:[c[0]],messages:[],memory:""};
+chats.push(chat);saveChats();activeChatId=chat.id;renderChat();
+}
+
+function openChat(id){activeChatId=id;renderChat();}
+
+function renameChat(id){
+const chat=chats.find(c=>c.id===id);if(!chat)return;
+const title=prompt("Новое название переписки:",chat.title);
+if(title&&title.trim()){chat.title=title.trim();saveChats();openApp("chats");}
+}
+
+function deleteChat(id){
+if(!confirm("Удалить эту переписку?"))return;
+chats=chats.filter(c=>c.id!==id);saveChats();openApp("chats");
+}
+
+function renderChat(){
+const chat=getChat();if(!chat)return;
+let html=`<button class="back" onclick="openApp('chats')">← К перепискам</button>
+<h2>${escapeHTML(chat.title)}</h2>
+<p class="note">${chat.type==="group"?"Участники: "+escapeHTML(chat.participants.join(", ")):escapeHTML(chat.participants[0])}</p>
+<div class="row">
+<button class="action" onclick="editMemory()">🧠 Память сюжета</button>
+<button class="action" onclick="renameChat('${chat.id}')">✏️ Название</button>
+</div>
+<div id="chatMessages">`;
+
+chat.messages.forEach((m,i)=>{
+const mine=m.role==="user";
+html+=`<div class="message ${mine?"mine":"theirs"}">
+${escapeHTML(m.content)}
+<div class="message-tools">`;
+if(mine)html+=`<button onclick="editMessage(${i})">Изменить</button>`;
+html+=`<button onclick="deleteMessage(${i})">Удалить</button>`;
+if(!mine)html+=`<button onclick="regenerate(${i})">Повторить ответ</button>`;
+html+='</div></div>';
+});
+html+=`</div>
+<form class="composer" onsubmit="sendChat(event)">
+<input id="chatInput" placeholder="Напиши сообщение..." autocomplete="off">
+<button class="primary" id="sendButton" type="submit">➤</button>
+</form><p class="note" id="chatStatus"></p>`;
+document.getElementById("panelContent").innerHTML=html;
+const box=document.getElementById("panel");
+box.scrollTop=box.scrollHeight;
+}
+
+function editMemory(){
+const chat=getChat();if(!chat)return;
+const memory=prompt("Память сюжета. Запиши важные события, отношения и детали:",chat.memory||"");
+if(memory!==null){chat.memory=memory;saveChats();renderChat();}
+}
+
+function editMessage(index){
+const chat=getChat();if(!chat||chat.messages[index].role!=="user")return;
+const value=prompt("Измени своё сообщение:",chat.messages[index].content);
+if(value!==null&&value.trim()){chat.messages[index].content=value.trim();chat.messages=chat.messages.slice(0,index+1);saveChats();renderChat();}
+}
+
+function deleteMessage(index){
+const chat=getChat();if(!chat)return;
+if(!confirm("Удалить сообщение?"))return;
+chat.messages.splice(index,1);saveChats();renderChat();
+}
+
+async function regenerate(index){
+const chat=getChat();if(!chat||busy)return;
+if(chat.messages[index].role!=="assistant")return;
+chat.messages=chat.messages.slice(0,index);
+saveChats();renderChat();
+await askAI(chat);
+}
+
+async function sendChat(event){
+event.preventDefault();
+if(busy)return;
+const input=document.getElementById("chatInput");
+const message=input.value.trim();
+const chat=getChat();
+if(!message||!chat)return;
+chat.messages.push({role:"user",content:message});
+saveChats();renderChat();
+await askAI(chat);
+}
+
+async function askAI(chat){
+busy=true;
+const status=document.getElementById("chatStatus");
+if(status)status.textContent="Персонаж печатает... 💭";
+const button=document.getElementById("sendButton");
+if(button)button.disabled=true;
+try{
+const response=await fetch("/api/chat",{
+method:"POST",
+headers:{"Content-Type":"application/json"},
+body:JSON.stringify({
+character:chat.participants.join(", "),
+messages:chat.messages.slice(-30),
+memory:chat.memory,
+group:chat.type==="group",
+participants:chat.participants
+})
+});
+const data=await response.json();
+if(!response.ok)throw new Error(data.error||"Ошибка сервера");
+chat.messages.push({role:"assistant",content:data.reply});
+saveChats();
+}catch(error){
+const current=getChat();
+if(current)current.messages.push({role:"assistant",content:"Не удалось получить ответ: "+error.message});
+saveChats();
+}finally{
+busy=false;
+if(getChat()&&getChat().id===chat.id)renderChat();
+}
+}
 </script>
 </body>
 </html>
