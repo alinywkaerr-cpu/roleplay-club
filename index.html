@@ -1,6 +1,4 @@
 
-
-
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -44,11 +42,10 @@ button{border:0;cursor:pointer}
 .action{background:#f5e4ed;color:#805b73;border-radius:15px;padding:10px 12px;margin:3px;font-size:13px}
 .primary{background:#e9c4d8;color:#583b4e;border-radius:18px;padding:12px 15px}
 .field{width:100%;border:1px solid #e6c5d7;border-radius:15px;padding:12px;background:white;color:#493744;margin:6px 0}
-.message{max-width:88%;padding:12px 14px;border-radius:18px;white-space:pre-wrap;overflow-wrap:anywhere;position:relative}
+.message{max-width:88%;padding:12px 14px;border-radius:18px;white-space:pre-wrap;overflow-wrap:anywhere;position:relative;cursor:pointer;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent;touch-action:pan-y}
+.message:active{transform:scale(0.99)}
 .mine{align-self:flex-end;background:#f2d5e3}
 .theirs{align-self:flex-start;background:white}
-.message-tools{display:flex;gap:4px;flex-wrap:wrap;margin-top:5px}
-.message-tools button{font-size:11px;padding:6px 8px;border-radius:10px;background:#f8eaf1;color:#805b73}
 #chatMessages{display:flex;flex-direction:column;gap:10px;margin:16px 0}
 .composer{display:flex;gap:7px;position:sticky;bottom:0;background:#fff8fc;padding:10px 0}
 .composer input{min-width:0;flex:1;border:1px solid #e6c5d7;border-radius:22px;padding:12px}
@@ -104,30 +101,27 @@ const characters=[
 ["BB","Big Bad Dogs","🐾"]
 ];
 
-
 function updateTime(){
 const now=new Date();
 const time=now.toLocaleTimeString('ru-RU',{
-hour:'2-digit',
-minute:'2-digit'
+hour:'2-digit',minute:'2-digit'
 });
-
 document.getElementById('clock').textContent=time;
 document.getElementById('date').textContent=now.toLocaleDateString('ru-RU',{
-weekday:'long',
-day:'numeric',
-month:'long'
+weekday:'long',day:'numeric',month:'long'
 });
 document.getElementById('statusTime').textContent=time;
 }
-
-updateTime();setInterval(updateTime,10000);
+updateTime();
+setInterval(updateTime,10000);
 
 function unlock(){
 document.getElementById('lock').style.display='none';
 document.getElementById('home').style.display='block';
 }
-function closeApp(){document.getElementById("panel").style.display="none";}
+function closeApp(){
+document.getElementById("panel").style.display="none";
+}
 
 function escapeHTML(value){
 return String(value).replace(/[&<>"']/g,char=>({
@@ -138,6 +132,8 @@ return String(value).replace(/[&<>"']/g,char=>({
 let chats=[];
 let activeChatId=null;
 let busy=false;
+let selectedMessageIndex=null;
+let messagePressTimer=null;
 
 try{
 chats=JSON.parse(localStorage.getItem("roleplay_conversations")||"[]");
@@ -237,30 +233,47 @@ if(selected.length<2){alert("Выбери хотя бы двух персона�
 const names=selected.map(i=>characters[i][0]);
 const title=document.getElementById("groupName").value.trim()||names.join(", ");
 const chat={id:makeId(),title,type:"group",participants:names,messages:[],memory:""};
-chats.push(chat);saveChats();activeChatId=chat.id;renderChat();
+chats.push(chat);
+saveChats();
+activeChatId=chat.id;
+renderChat();
 }
 
 function createPrivate(index){
 const c=characters[index];
 const chat={id:makeId(),title:c[0],type:"private",participants:[c[0]],messages:[],memory:""};
-chats.push(chat);saveChats();activeChatId=chat.id;renderChat();
+chats.push(chat);
+saveChats();
+activeChatId=chat.id;
+renderChat();
 }
 
-function openChat(id){activeChatId=id;renderChat();}
+function openChat(id){
+activeChatId=id;
+renderChat();
+}
 
 function renameChat(id){
-const chat=chats.find(c=>c.id===id);if(!chat)return;
+const chat=chats.find(c=>c.id===id);
+if(!chat)return;
 const title=prompt("Новое название переписки:",chat.title);
-if(title&&title.trim()){chat.title=title.trim();saveChats();openApp("chats");}
+if(title&&title.trim()){
+chat.title=title.trim();
+saveChats();
+openApp("chats");
+}
 }
 
 function deleteChat(id){
 if(!confirm("Удалить эту переписку?"))return;
-chats=chats.filter(c=>c.id!==id);saveChats();openApp("chats");
+chats=chats.filter(c=>c.id!==id);
+saveChats();
+openApp("chats");
 }
 
 function renderChat(){
-const chat=getChat();if(!chat)return;
+const chat=getChat();
+if(!chat)return;
 let html=`<button class="back" onclick="openApp('chats')">← К перепискам</button>
 <h2>${escapeHTML(chat.title)}</h2>
 <p class="note">${chat.type==="group"?"Участники: "+escapeHTML(chat.participants.join(", ")):escapeHTML(chat.participants[0])}</p>
@@ -272,14 +285,16 @@ let html=`<button class="back" onclick="openApp('chats')">← К перепис�
 
 chat.messages.forEach((m,i)=>{
 const mine=m.role==="user";
-html+=`<div class="message ${mine?"mine":"theirs"}">
+html+=`<div class="message ${mine?"mine":"theirs"}"
+onpointerdown="startMessagePress(event,${i})"
+onpointerup="cancelMessagePress()"
+onpointerleave="cancelMessagePress()"
+onpointercancel="cancelMessagePress()"
+oncontextmenu="return false">
 ${escapeHTML(m.content)}
-<div class="message-tools">`;
-if(mine)html+=`<button onclick="editMessage(${i})">Изменить</button>`;
-html+=`<button onclick="deleteMessage(${i})">Удалить</button>`;
-if(!mine)html+=`<button onclick="regenerate(${i})">Повторить ответ</button>`;
-html+='</div></div>';
+</div>`;
 });
+
 html+=`</div>
 <form class="composer" onsubmit="sendChat(event)">
 <input id="chatInput" placeholder="Напиши сообщение..." autocomplete="off">
@@ -290,29 +305,111 @@ const box=document.getElementById("panel");
 box.scrollTop=box.scrollHeight;
 }
 
+/* Долгое нажатие на сообщение */
+function startMessagePress(event,index){
+if(event.pointerType==="mouse"&&event.button!==0)return;
+cancelMessagePress();
+messagePressTimer=setTimeout(()=>{
+messagePressTimer=null;
+showMessageMenu(index);
+},550);
+}
+
+function cancelMessagePress(){
+if(messagePressTimer!==null){
+clearTimeout(messagePressTimer);
+messagePressTimer=null;
+}
+}
+
+function showMessageMenu(index){
+closeMessageMenu();
+selectedMessageIndex=index;
+const chat=getChat();
+if(!chat)return;
+const message=chat.messages[index];
+if(!message)return;
+const mine=message.role==="user";
+
+let html=`<div id="messageMenu" style="
+position:fixed;inset:0;background:#49374455;
+z-index:1000;display:flex;align-items:center;
+justify-content:center;padding:25px"
+onclick="closeMessageMenu()">
+<div style="background:#fff8fc;padding:20px;
+border-radius:22px;width:100%;max-width:300px;
+box-shadow:0 8px 30px #49374433"
+onclick="event.stopPropagation()">
+<strong>Действия с сообщением</strong>
+<div class="row" style="margin-top:15px">
+${mine?`<button class="action" onclick="editMessage(selectedMessageIndex);closeMessageMenu()">✏️ Изменить</button>`:""}
+${mine?`<button class="action" onclick="deleteMessage(selectedMessageIndex);closeMessageMenu()">🗑️ Удалить</button>`:""}
+${!mine?`<button class="action" onclick="regenerate(selectedMessageIndex);closeMessageMenu()">🔄 Повторить ответ</button>`:""}
+<button class="action" onclick="copyMessage()">📋 Копировать</button>
+</div>
+<button class="back" style="margin-top:12px" onclick="closeMessageMenu()">Закрыть</button>
+</div></div>`;
+
+document.body.insertAdjacentHTML("beforeend",html);
+}
+
+function closeMessageMenu(){
+const menu=document.getElementById("messageMenu");
+if(menu)menu.remove();
+}
+
+async function copyMessage(){
+const chat=getChat();
+if(!chat)return;
+const message=chat.messages[selectedMessageIndex];
+if(!message)return;
+try{
+await navigator.clipboard.writeText(message.content);
+}catch(e){
+alert("Не удалось скопировать. Попробуй ещё раз.");
+}
+closeMessageMenu();
+}
+
 function editMemory(){
-const chat=getChat();if(!chat)return;
+const chat=getChat();
+if(!chat)return;
 const memory=prompt("Память сюжета. Запиши важные события, отношения и детали:",chat.memory||"");
-if(memory!==null){chat.memory=memory;saveChats();renderChat();}
+if(memory!==null){
+chat.memory=memory;
+saveChats();
+renderChat();
+}
 }
 
 function editMessage(index){
-const chat=getChat();if(!chat||chat.messages[index].role!=="user")return;
+const chat=getChat();
+if(!chat||!chat.messages[index]||chat.messages[index].role!=="user")return;
 const value=prompt("Измени своё сообщение:",chat.messages[index].content);
-if(value!==null&&value.trim()){chat.messages[index].content=value.trim();chat.messages=chat.messages.slice(0,index+1);saveChats();renderChat();}
+if(value!==null&&value.trim()){
+chat.messages[index].content=value.trim();
+chat.messages=chat.messages.slice(0,index+1);
+saveChats();
+renderChat();
+}
 }
 
 function deleteMessage(index){
-const chat=getChat();if(!chat)return;
+const chat=getChat();
+if(!chat)return;
 if(!confirm("Удалить сообщение?"))return;
-chat.messages.splice(index,1);saveChats();renderChat();
+chat.messages.splice(index,1);
+saveChats();
+renderChat();
 }
 
 async function regenerate(index){
-const chat=getChat();if(!chat||busy)return;
-if(chat.messages[index].role!=="assistant")return;
+const chat=getChat();
+if(!chat||busy)return;
+if(!chat.messages[index]||chat.messages[index].role!=="assistant")return;
 chat.messages=chat.messages.slice(0,index);
-saveChats();renderChat();
+saveChats();
+renderChat();
 await askAI(chat);
 }
 
@@ -324,7 +421,8 @@ const message=input.value.trim();
 const chat=getChat();
 if(!message||!chat)return;
 chat.messages.push({role:"user",content:message});
-saveChats();renderChat();
+saveChats();
+renderChat();
 await askAI(chat);
 }
 
@@ -351,8 +449,7 @@ if(!response.ok)throw new Error(data.error||"Ошибка сервера");
 chat.messages.push({role:"assistant",content:data.reply});
 saveChats();
 }catch(error){
-const current=getChat();
-if(current)current.messages.push({role:"assistant",content:"Не удалось получить ответ: "+error.message});
+chat.messages.push({role:"assistant",content:"Не удалось получить ответ: "+error.message});
 saveChats();
 }finally{
 busy=false;
