@@ -1,5 +1,6 @@
 
 
+
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -56,7 +57,7 @@ button{border:0;cursor:pointer}
 </head>
 <body>
 <div class="phone">
-<div class="status"><span>9:41</span><span>●●● Wi-Fi ▰</span></div>
+<div class="status"><span id="statusTime">09:41</span><span>●●● Wi-Fi ▰</span></div>
 
 <section class="screen lock" id="lock">
 <div class="date" id="date"></div>
@@ -103,11 +104,23 @@ const characters=[
 ["BB","Big Bad Dogs","🐾"]
 ];
 
+
 function updateTime(){
 const now=new Date();
-document.getElementById('clock').textContent=now.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});
-document.getElementById('date').textContent=now.toLocaleDateString('ru-RU',{weekday:'long',day:'numeric',month:'long'});
+const time=now.toLocaleTimeString('ru-RU',{
+hour:'2-digit',
+minute:'2-digit'
+});
+
+document.getElementById('clock').textContent=time;
+document.getElementById('date').textContent=now.toLocaleDateString('ru-RU',{
+weekday:'long',
+day:'numeric',
+month:'long'
+});
+document.getElementById('statusTime').textContent=time;
 }
+
 updateTime();setInterval(updateTime,10000);
 
 function unlock(){
