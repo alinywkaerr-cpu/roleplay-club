@@ -1,4 +1,5 @@
 
+
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
@@ -13,7 +14,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { messages, character } = req.body || {};
+    const { messages, character, memory, group, participants } = req.body || {};
 
     if (!Array.isArray(messages) || messages.length === 0) {
       return res.status(400).json({ error: "Напиши сообщение" });
@@ -27,6 +28,29 @@ export default async function handler(req, res) {
       });
     }
 
+    const participantList = Array.isArray(participants)
+      ? participants.filter(x => typeof x === "string").join(", ")
+      : "";
+
+    let systemContent;
+
+    if (group && participantList) {
+      systemContent = `Ты ведёшь групповой ролевой чат. Участники: ${participantList}.
+
+Играй за этих персонажей, а не за пользователя. Пиши реплики разных персонажей, явно указывая имя перед каждой репликой. Необязательно задействовать всех персонажей в каждом ответе. Сохраняй различия в характерах и манере речи. Не управляй действиями, словами и мыслями пользователя. Учитывай контекст переписки и не выдумывай неизвестные факты канона.`;
+    } else {
+      systemContent = `Ты играешь роль персонажа ${character || "собеседник"} в ролевой истории. Отвечай естественно, живо и последовательно. Не управляй действиями, словами и мыслями пользователя. Не выходи из роли без необходимости. Не выдумывай неизвестные факты канона.`;
+    }
+
+    if (typeof memory === "string" && memory.trim()) {
+      systemContent += `
+
+ПАМЯТЬ ЭТОГО СЮЖЕТА:
+${memory.trim()}
+
+Учитывай её как уже произошедшие события. Не противоречь ей.`;
+    }
+
     const response = await fetch(
       "https://api.groq.com/openai/v1/chat/completions",
       {
@@ -38,14 +62,11 @@ export default async function handler(req, res) {
         body: JSON.stringify({
           model: "openai/gpt-oss-20b",
           messages: [
-            {
-              role: "system",
-              content: `Ты играешь роль персонажа ${character || "собеседник"} в ролевой истории. Отвечай естественно, живо и последовательно. Не управляй действиями и мыслями пользователя. Не выходи из роли без необходимости.`
-            },
-            ...messages
+            { role: "system", content: systemContent },
+            ...messages.slice(-30)
           ],
           temperature: 0.85,
-          max_tokens: 800
+          max_tokens: 1000
         })
       }
     );
