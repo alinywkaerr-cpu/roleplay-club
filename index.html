@@ -1,4 +1,5 @@
 
+
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -126,6 +127,21 @@ button{border:0;cursor:pointer}
 .password-recovery-card h2{margin:0 0 8px;color:#68465b}
 .password-recovery-card p{font-size:13px;line-height:1.5;color:#896b7e}
 .password-recovery-card button{width:100%;margin-top:9px}
+
+/* ===== ПРОФИЛИ ПЕРСОНАЖЕЙ ===== */
+.profile-cover{background:linear-gradient(145deg,#f9e3ed,#e8c3d8);border-radius:24px;padding:18px;margin:10px 0 15px;text-align:center}
+.profile-main-avatar{width:150px;height:150px;border-radius:30px;margin:5px auto 13px;background:#fff7fb;display:grid;place-items:center;overflow:hidden;font-size:65px;box-shadow:0 8px 25px #9d6d8930}
+.profile-main-avatar img{width:100%;height:100%;object-fit:cover}
+.profile-cover h2{margin:8px 0 4px;font-size:23px}
+.profile-cover p{margin:5px 0;color:#89677d;font-size:13px}
+.profile-section{background:white;border-radius:19px;padding:15px;margin:10px 0;box-shadow:0 3px 12px #9d6d8910}
+.profile-section h3{font-size:15px;margin:0 0 8px;color:#805b73}
+.profile-section textarea{width:100%;min-height:75px;resize:vertical;border:1px solid #ead0dd;border-radius:13px;padding:11px;background:#fffafd;color:#493744;font:inherit;font-size:14px;line-height:1.5;outline:none}
+.profile-section textarea:focus{border-color:#d59ab8;box-shadow:0 0 0 3px #f5e4ed}
+.profile-section .profile-short{min-height:48px}
+.profile-buttons{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
+.profile-buttons button{flex:1;min-width:100px}
+.profile-hint{font-size:12px;color:#a18395;line-height:1.5;margin:10px 2px}
 </style>
 </head>
 <body>
@@ -351,6 +367,102 @@ let typingChatId=null;
 let avatarTargetIndex=null;
 let toastTimer=null;
 
+/* Профили персонажей */
+let characterProfiles={};
+try{
+const savedProfiles=JSON.parse(localStorage.getItem("roleplay_character_profiles")||"{}");
+if(savedProfiles&&typeof savedProfiles==="object"&&!Array.isArray(savedProfiles))characterProfiles=savedProfiles;
+}catch(e){}
+
+function getCharacterProfile(character){
+const key=characterKey(character);
+if(!characterProfiles[key]){
+characterProfiles[key]={
+description:"",
+age:"",
+appearance:"",
+personality:"",
+speech:"",
+habits:"",
+backstory:""
+};
+}
+return characterProfiles[key];
+}
+function saveCharacterProfiles(){
+localStorage.setItem("roleplay_character_profiles",JSON.stringify(characterProfiles));
+}
+function openCharacterProfile(index){
+const character=characters[index];
+if(!character)return;
+const profile=getCharacterProfile(character);
+const src=getAvatar(character);
+const avatar=src?`<img src="${escapeHTML(src)}" alt="">`:escapeHTML(character[2]||"♡");
+const content=document.getElementById("panelContent");
+content.innerHTML=`
+<button class="back" onclick="openApp('characters')">← К персонажам</button>
+<div class="profile-cover">
+<div class="profile-main-avatar">${avatar}</div>
+<h2>${escapeHTML(character[0])}</h2>
+<p>${escapeHTML(character[1])}</p>
+<p>${escapeHTML(character[3])}</p>
+<div class="profile-buttons">
+<button class="action" onclick="chooseCharacterPhoto(${index})">📷 Изменить фото</button>
+<button class="action" onclick="createPrivate(${index})">💬 Написать</button>
+</div>
+</div>
+<p class="profile-hint">♡ Здесь можно собрать полное досье на персонажа. Изменения сохраняются на этом устройстве.</p>
+<div class="profile-section">
+<h3>✧ Краткое описание</h3>
+<textarea id="profile-description" placeholder="Кто этот персонаж? Чем он занимается?">${escapeHTML(profile.description)}</textarea>
+</div>
+<div class="profile-section">
+<h3>🎂 Возраст</h3>
+<textarea class="profile-short" id="profile-age" placeholder="Возраст персонажа">${escapeHTML(profile.age)}</textarea>
+</div>
+<div class="profile-section">
+<h3>🪞 Внешность</h3>
+<textarea id="profile-appearance" placeholder="Рост, цвет волос и глаз, одежда, особенности внешности...">${escapeHTML(profile.appearance)}</textarea>
+</div>
+<div class="profile-section">
+<h3>💗 Характер</h3>
+<textarea id="profile-personality" placeholder="Черты характера, достоинства, недостатки, отношение к другим...">${escapeHTML(profile.personality)}</textarea>
+</div>
+<div class="profile-section">
+<h3>💬 Манера речи</h3>
+<textarea id="profile-speech" placeholder="Как разговаривает? Какие слова использует? Есть ли любимые выражения?">${escapeHTML(profile.speech)}</textarea>
+</div>
+<div class="profile-section">
+<h3>🌷 Привычки и особенности</h3>
+<textarea id="profile-habits" placeholder="Привычки, увлечения, страхи, любимые вещи и мелочи...">${escapeHTML(profile.habits)}</textarea>
+</div>
+<div class="profile-section">
+<h3>📖 Биография и история</h3>
+<textarea id="profile-backstory" style="min-height:140px" placeholder="Прошлое персонажа, важные события, отношения, сюжетные детали...">${escapeHTML(profile.backstory)}</textarea>
+</div>
+<div class="profile-buttons">
+<button class="primary" onclick="saveCharacterProfile(${index})">💗 Сохранить профиль</button>
+<button class="action" onclick="openApp('characters')">Назад в каталог</button>
+</div>`;
+document.getElementById("panel").style.display="block";
+}
+function saveCharacterProfile(index){
+const character=characters[index];
+if(!character)return;
+const profile=getCharacterProfile(character);
+["description","age","appearance","personality","speech","habits","backstory"].forEach(field=>{
+const input=document.getElementById("profile-"+field);
+if(input)profile[field]=input.value.trim();
+});
+try{
+saveCharacterProfiles();
+showToast("Профиль персонажа сохранён! ♡");
+openCharacterProfile(index);
+}catch(error){
+showToast("Не удалось сохранить профиль. Возможно, закончилось место в памяти браузера.");
+}
+}
+
 try{
 const savedCharacters=JSON.parse(localStorage.getItem("roleplay_custom_characters")||"[]");
 if(Array.isArray(savedCharacters))savedCharacters.forEach(c=>{if(Array.isArray(c)&&c.length>=4)characters.push(c)});
@@ -532,6 +644,7 @@ html+=`<div class="character-card">
 </div>
 <div class="character-actions">
 <button class="primary" onclick="createPrivate(${i})">Написать</button>
+<button class="action" onclick="openCharacterProfile(${i})">♡ Профиль</button>
 <button class="action" onclick="chooseCharacterPhoto(${i})">📷 Фото</button>
 ${avatarOverrides[characterKey(c)]?`<button class="action" onclick="resetCharacterPhoto(${i})">↩️ Вернуть</button>`:""}
 ${i>=5?`<button class="action" onclick="removeCustomCharacter(${i})">Удалить</button>`:""}
@@ -572,6 +685,8 @@ if(!confirm("Удалить этого персонажа из каталога?
 const removed=characters[index];
 favorites=favorites.filter(x=>x!==characterKey(removed));
 delete avatarOverrides[characterKey(removed)];
+delete characterProfiles[characterKey(removed)];
+saveCharacterProfiles();
 characters.splice(index,1);
 saveCharacters();saveFavorites();saveAvatars();renderCharacterList();
 }
@@ -601,7 +716,12 @@ canvas.width=Math.round(image.width*scale);canvas.height=Math.round(image.height
 const ctx=canvas.getContext("2d");ctx.drawImage(image,0,0,canvas.width,canvas.height);
 const data=canvas.toDataURL("image/jpeg",.76);
 avatarOverrides[characterKey(character)]=data;
-try{saveAvatars();renderCharacterList();showToast("Фотография персонажа обновлена ♡")}
+try{
+saveAvatars();
+if(document.getElementById("profile-description"))openCharacterProfile(index);
+else renderCharacterList();
+showToast("Фотография персонажа обновлена ♡");
+}
 catch(e){delete avatarOverrides[characterKey(character)];alert("Не удалось сохранить фото. Возможно, в памяти браузера закончилось место. Попробуй другое, более маленькое изображение.")}
 };
 image.onerror=()=>alert("Не удалось открыть это изображение.");
@@ -612,7 +732,10 @@ reader.readAsDataURL(file);
 function resetCharacterPhoto(index){
 const c=characters[index];if(!c)return;
 if(!confirm("Вернуть исходную фотографию персонажа?"))return;
-delete avatarOverrides[characterKey(c)];saveAvatars();renderCharacterList();showToast("Исходная фотография восстановлена ♡");
+delete avatarOverrides[characterKey(c)];saveAvatars();
+if(document.getElementById("profile-description"))openCharacterProfile(index);
+else renderCharacterList();
+showToast("Исходная фотография восстановлена ♡");
 }
 
 /* ===== ПОИСК WIKIDATA И VNDB ===== */
