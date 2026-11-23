@@ -1,9 +1,12 @@
 
 
+
 const FANDOM_API = "https://romanceclub.fandom.com/ru/api.php";
+const WIKIDATA_API = "https://www.wikidata.org/w/api.php";
 
 async function searchWikidata(query) {
-  const url = new URL("https://www.wikidata.org/w/api.php");
+  const url = new URL(WIKIDATA_API);
+
   url.search = new URLSearchParams({
     action: "wbsearchentities",
     search: query,
@@ -26,6 +29,69 @@ async function searchWikidata(query) {
     category: "Игры",
     game: ""
   }));
+}
+
+async function searchFilmTv(query) {
+  const url = new URL(WIKIDATA_API);
+
+  url.search = new URLSearchParams({
+    action: "wbsearchentities",
+    search: query,
+    language: "ru",
+    format: "json",
+    limit: "10"
+  });
+
+  const response = await fetch(url);
+  if (!response.ok) throw new Error("Поиск фильмов и сериалов недоступен");
+
+  const data = await response.json();
+  const items = data.search || [];
+
+  if (!items.length) return [];
+
+  const ids = items.map(item => item.id).join("|");
+
+  const detailsUrl = new URL(WIKIDATA_API);
+
+  detailsUrl.search = new URLSearchParams({
+    action: "wbgetentities",
+    ids,
+    languages: "ru|en",
+    props: "claims|labels|descriptions",
+    format: "json"
+  });
+
+  const detailsResponse = await fetch(detailsUrl);
+
+  const detailsData = detailsResponse.ok
+    ? await detailsResponse.json()
+    : { entities: {} };
+
+  const entities = detailsData.entities || {};
+
+  return items.map(item => {
+    const entity = entities[item.id] || {};
+    const claims = entity.claims || {};
+
+    const imageClaim = claims.P18?.[0]?.mainsnak?.datavalue?.value;
+
+    const image = imageClaim
+      ? "https://commons.wikimedia.org/wiki/Special:FilePath/" +
+        encodeURIComponent(imageClaim)
+      : "";
+
+    return {
+      id: item.id,
+      name: item.label || "",
+      description: item.description || "",
+      image,
+      source: "Wikidata",
+      category: "Фильмы и сериалы",
+      game: "",
+      url: "https://www.wikidata.org/wiki/" + item.id
+    };
+  });
 }
 
 async function searchVndb(query) {
@@ -79,6 +145,7 @@ async function searchRomanceClub(query) {
   if (!pages.length) return [];
 
   const imageUrl = new URL(FANDOM_API);
+
   imageUrl.search = new URLSearchParams({
     action: "query",
     pageids: pages.map(p => p.pageid).join("|"),
@@ -114,7 +181,7 @@ async function searchRomanceClub(query) {
       source: "Клуб Романтики",
       category: "Клуб Романтики",
       game: "Клуб Романтики",
-      url: page.fullurl || 
+      url: page.fullurl ||
         "https://romanceclub.fandom.com/ru/wiki/" +
         encodeURIComponent(item.title.replace(/ /g, "_"))
     };
@@ -150,6 +217,12 @@ export default async function handler(req, res) {
       source === "rc"
     ) {
       results = await searchRomanceClub(query);
+    } else if (
+      source === "movies" ||
+      source === "films" ||
+      source === "tv"
+    ) {
+      results = await searchFilmTv(query);
     } else {
       return res.status(400).json({
         error: "Неизвестный источник поиска"
@@ -170,4 +243,3 @@ export default async function handler(req, res) {
     });
   }
 }
-
