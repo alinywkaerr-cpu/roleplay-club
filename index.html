@@ -1,4 +1,5 @@
 
+
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -845,15 +846,109 @@ alert("Не удалось скопировать. Попробуй ещё ра�
 closeMessageMenu();
 }
 
+/* НОВОЕ БОЛЬШОЕ ОКНО ПАМЯТИ СЮЖЕТА */
 function editMemory(){
 const chat=getChat();
 if(!chat)return;
-const memory=prompt("Память сюжета. Запиши важные события, отношения и детали:",chat.memory||"");
-if(memory!==null){
-chat.memory=memory;
+
+closeStoryMemory();
+
+const overlay=document.createElement("div");
+overlay.id="storyMemoryModal";
+
+overlay.style.cssText=`
+position:fixed;
+inset:0;
+z-index:2000;
+background:#49374488;
+display:flex;
+align-items:center;
+justify-content:center;
+padding:18px;
+`;
+
+overlay.innerHTML=`
+<div style="
+width:100%;
+max-width:440px;
+max-height:85vh;
+background:#fff8fc;
+border:1px solid #f2d9e6;
+border-radius:25px;
+padding:20px;
+box-shadow:0 12px 40px #49374444;
+display:flex;
+flex-direction:column;
+gap:12px;
+" onclick="event.stopPropagation()">
+
+<div style="display:flex;align-items:center;justify-content:space-between">
+<strong style="font-size:19px;color:#68465b">
+🧠 Память сюжета
+</strong>
+<button onclick="closeStoryMemory()" style="
+background:#f5e4ed;
+color:#805b73;
+border-radius:50%;
+width:34px;
+height:34px;
+font-size:19px;
+">×</button>
+</div>
+
+<p class="note" style="margin:0">
+Записывай важные события, отношения, обещания и детали вашей истории ♡
+</p>
+
+<textarea id="storyMemoryInput"
+placeholder="Например: мы давно знакомы, недавно признались друг другу в чувствах..."
+style="
+width:100%;
+min-height:220px;
+max-height:45vh;
+resize:vertical;
+overflow-y:auto;
+border:1px solid #e6c5d7;
+border-radius:17px;
+padding:14px;
+background:white;
+color:#493744;
+font:inherit;
+font-size:15px;
+line-height:1.6;
+outline:none;
+">${escapeHTML(chat.memory||"")}</textarea>
+
+<div class="row" style="justify-content:flex-end">
+<button class="action" onclick="closeStoryMemory()">
+Отмена
+</button>
+<button class="primary" onclick="saveStoryMemory()">
+💗 Сохранить
+</button>
+</div>
+</div>
+`;
+
+overlay.addEventListener("click",closeStoryMemory);
+document.body.appendChild(overlay);
+}
+
+function saveStoryMemory(){
+const chat=getChat();
+const input=document.getElementById("storyMemoryInput");
+
+if(!chat||!input)return;
+
+chat.memory=input.value;
 saveChats();
+closeStoryMemory();
 renderChat();
 }
+
+function closeStoryMemory(){
+const modal=document.getElementById("storyMemoryModal");
+if(modal)modal.remove();
 }
 
 async function editMessage(index){
@@ -941,8 +1036,8 @@ saveChats();
 busy=false;
 if(getChat()&&getChat().id===chat.id)renderChat();
 }
-} 
-  
+}
+
 /* ===== ДОПОЛНЕНИЕ: КЛУБ РОМАНТИКИ ===== */
 
 if (!categories.includes("Клуб Романтики")) {
@@ -1103,5 +1198,3 @@ addCatalogCharacter = function(source, index) {
 </script>
 </body>
 </html>
-
-
