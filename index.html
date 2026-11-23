@@ -1,4 +1,5 @@
 
+
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -56,7 +57,8 @@ button{border:0;cursor:pointer}
 .category-list button.active{background:#e9c4d8;color:#583b4e;font-weight:700}
 .character-card{background:#fff;border-radius:20px;padding:14px;margin:10px 0;box-shadow:0 3px 12px #9d6d8910}
 .character-top{display:flex;align-items:center;gap:12px}
-.character-avatar{width:54px;height:54px;border-radius:18px;background:#f5e4ed;display:grid;place-items:center;font-size:27px;flex-shrink:0}
+.character-avatar{width:54px;height:54px;border-radius:18px;background:#f5e4ed;display:grid;place-items:center;font-size:27px;flex-shrink:0;overflow:hidden}
+.character-avatar img{width:100%;height:100%;object-fit:cover}
 .character-info{flex:1;min-width:0}
 .character-info strong{display:block}
 .character-info small{display:block;color:#997b8d;margin-top:4px}
@@ -64,6 +66,16 @@ button{border:0;cursor:pointer}
 .character-actions{display:flex;gap:7px;margin-top:12px}
 .character-actions button{flex:1}
 .empty{text-align:center;padding:24px 12px;color:#96778a;font-size:13px}
+.anilist-box{background:#fff0f6;border:1px solid #f0d4e2;border-radius:20px;padding:14px;margin:14px 0}
+.anilist-box h3{margin:3px 0 7px}
+.anilist-box .primary{width:100%;margin-top:7px}
+.anilist-result{display:flex;gap:11px;align-items:center;background:#fff;border-radius:16px;padding:10px;margin:9px 0}
+.anilist-result img{width:62px;height:78px;object-fit:cover;border-radius:11px;background:#f5e4ed;flex-shrink:0}
+.anilist-result-info{flex:1;min-width:0}
+.anilist-result-info strong{display:block;font-size:14px}
+.anilist-result-info small{display:block;color:#997b8d;margin-top:4px;font-size:12px}
+.anilist-result button{background:#f5e4ed;color:#805b73;border-radius:12px;padding:9px;font-size:12px}
+.anilist-status{font-size:13px;color:#805b73;margin:10px 2px;line-height:1.5}
 </style>
 </head>
 <body>
@@ -123,6 +135,7 @@ const characters=[
 let favorites=[];
 let catalogCategory="Все";
 let catalogSearch="";
+let anilistResults=[];
 
 try{
 const savedCharacters=JSON.parse(localStorage.getItem("roleplay_custom_characters")||"[]");
@@ -254,13 +267,26 @@ panel.style.display="block";
 function renderCharacterCatalog(){
 let html=`
 <p class="note">Твоя коллекция персонажей из разных миров. Ищи любимых или добавляй собственных ♡</p>
-<input class="field catalog-search" id="characterSearch" placeholder="🔎 Найти персонажа или произведение..." value="${escapeHTML(catalogSearch)}" oninput="catalogSearch=this.value;renderCharacterList()">
+
+<input class="field catalog-search" id="characterSearch" placeholder="🔎 Найти персонажа в своей коллекции..." value="${escapeHTML(catalogSearch)}" oninput="catalogSearch=this.value;renderCharacterList()">
+
 <div class="category-list">`;
 categories.forEach(cat=>{
 html+=`<button class="${catalogCategory===cat?"active":""}" onclick="setCatalogCategory('${cat}')">${cat}</button>`;
 });
 html+=`</div>
+
 <button class="primary" onclick="showAddCharacter()">＋ Добавить своего персонажа</button>
+
+<div class="anilist-box">
+<h3>🌸 Поиск по AniList</h3>
+<p class="note">Ищи персонажей из аниме и манги по имени. Найденных можно добавить в свою коллекцию.</p>
+<input class="field" id="aniSearch" placeholder="Например: Gojo Satoru" onkeydown="if(event.key==='Enter'){searchAniList()}">
+<button class="primary" id="aniSearchButton" onclick="searchAniList()">🔎 Найти персонажа</button>
+<div id="aniStatus" class="anilist-status"></div>
+<div id="aniResults"></div>
+</div>
+
 <div id="characterList"></div>`;
 document.getElementById("panelContent").innerHTML=html;
 renderCharacterList();
@@ -295,9 +321,13 @@ return;
 let html="";
 filtered.forEach(({c,i})=>{
 const favorite=favorites.includes(characterKey(c));
+const avatar=c[4]
+?`<img src="${escapeHTML(c[4])}" alt="">`
+:escapeHTML(c[2]);
+
 html+=`<div class="character-card">
 <div class="character-top">
-<div class="character-avatar">${escapeHTML(c[2])}</div>
+<div class="character-avatar">${avatar}</div>
 <div class="character-info">
 <strong>${escapeHTML(c[0])}</strong>
 <small>${escapeHTML(c[1])}</small>
@@ -372,6 +402,157 @@ saveFavorites();
 renderCharacterList();
 }
 
+/* ПОИСК ПЕРСОНАЖЕЙ ANILIST */
+async function searchAniList(){
+const input=document.getElementById("aniSearch");
+const status=document.getElementById("aniStatus");
+const results=document.getElementById("aniResults");
+const button=document.getElementById("aniSearchButton");
+
+if(!input||!status||!results||!button)return;
+
+const search=input.value.trim();
+if(!search){
+status.textContent="Сначала введи имя персонажа ♡";
+results.innerHTML="";
+return;
+}
+
+button.disabled=true;
+button.textContent="Ищем...";
+status.textContent="Ищем персонажей в AniList... 🌸";
+results.innerHTML="";
+
+const query=`
+query ($search: String!) {
+  Page(perPage: 12) {
+    characters(search: $search, sort: SEARCH_MATCH) {
+      id
+      name {
+        full
+        native
+      }
+      image {
+        large
+      }
+      media(perPage: 3, sort: POPULARITY_DESC) {
+        nodes {
+          title {
+            romaji
+            english
+          }
+        }
+      }
+    }
+  }
+}`;
+
+try{
+const controller=new AbortController();
+const timeout=setTimeout(()=>controller.abort(),15000);
+
+let response;
+try{
+response=await fetch("https://graphql.anilist.co",{
+method:"POST",
+headers:{
+"Content-Type":"application/json",
+"Accept":"application/json"
+},
+body:JSON.stringify({
+query,
+variables:{search}
+}),
+signal:controller.signal
+});
+}finally{
+clearTimeout(timeout);
+}
+
+const data=await response.json();
+
+if(!response.ok){
+throw new Error(data.errors?.[0]?.message||"AniList ответил ошибкой. Попробуй ещё раз.");
+}
+if(data.errors&&data.errors.length){
+throw new Error(data.errors[0].message||"Ошибка поиска AniList");
+}
+
+anilistResults=data.data?.Page?.characters||[];
+
+if(!anilistResults.length){
+status.textContent="Ничего не найдено. Попробуй другое написание имени.";
+return;
+}
+
+status.textContent=`Нашлось персонажей: ${anilistResults.length} ♡`;
+
+let html="";
+anilistResults.forEach((character,index)=>{
+const name=character.name?.full||"Без имени";
+const image=character.image?.large||"";
+const titles=(character.media?.nodes||[])
+.map(m=>m.title?.english||m.title?.romaji)
+.filter(Boolean);
+const source=titles.length?titles.join(", "):"Аниме или манга";
+
+html+=`<div class="anilist-result">
+${image?`<img src="${escapeHTML(image)}" alt="" loading="lazy">`:`<div class="character-avatar">🌸</div>`}
+<div class="anilist-result-info">
+<strong>${escapeHTML(name)}</strong>
+<small>${escapeHTML(source)}</small>
+<button onclick="addAniListCharacter(${index})">＋ Добавить</button>
+</div>
+</div>`;
+});
+
+results.innerHTML=html;
+
+}catch(error){
+if(error.name==="AbortError"){
+status.textContent="Поиск занял слишком много времени. Проверь интернет и попробуй ещё раз.";
+}else{
+status.textContent="Не удалось выполнить поиск: "+(error.message||"неизвестная ошибка");
+}
+}finally{
+button.disabled=false;
+button.textContent="🔎 Найти персонажа";
+}
+}
+
+function addAniListCharacter(index){
+const character=anilistResults[index];
+if(!character)return;
+
+const name=character.name?.full||"Без имени";
+const titles=(character.media?.nodes||[])
+.map(m=>m.title?.english||m.title?.romaji)
+.filter(Boolean);
+const source=titles[0]||"Аниме или манга";
+const image=character.image?.large||"";
+
+if(characters.some(c=>c[0].toLowerCase()===name.toLowerCase()&&c[1].toLowerCase()===source.toLowerCase())){
+alert("Этот персонаж уже есть в каталоге ♡");
+return;
+}
+
+characters.push([
+name,
+source,
+"🌸",
+"Аниме и манга",
+image
+]);
+
+saveCharacters();
+catalogCategory="Все";
+catalogSearch="";
+renderCharacterCatalog();
+
+const status=document.getElementById("aniStatus");
+if(status)status.textContent="Персонаж добавлен в твою коллекцию! ♡";
+}
+
 function chooseNewChat(){
 openApp("characters");
 }
@@ -384,6 +565,7 @@ html+=`<label class="item" style="display:block"><input type="checkbox" class="g
 html+='<input class="field" id="groupName" placeholder="Название группового чата">';
 html+='<button class="primary" onclick="createGroup()">Создать группу</button>';
 document.getElementById("panelContent").innerHTML=html;
+document.getElementById("panel").style.display="block";
 }
 
 function createGroup(){
@@ -470,7 +652,6 @@ const box=document.getElementById("panel");
 box.scrollTop=box.scrollHeight;
 }
 
-/* Долгое нажатие на сообщение */
 function startMessagePress(event,index){
 if(event.pointerType==="mouse"&&event.button!==0)return;
 cancelMessagePress();
@@ -628,5 +809,3 @@ if(getChat()&&getChat().id===chat.id)renderChat();
 </script>
 </body>
 </html>
-
-
