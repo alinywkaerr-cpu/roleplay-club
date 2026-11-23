@@ -1,5 +1,6 @@
 
 
+
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -123,6 +124,11 @@ button{border:0;cursor:pointer}
 .avatar-upload{background:#fff0f6;border:1px dashed #d9a9c1;border-radius:18px;padding:13px;margin:10px 0}
 .toast{position:fixed;z-index:3000;left:50%;bottom:25px;transform:translateX(-50%);background:#68465b;color:white;padding:12px 18px;border-radius:20px;box-shadow:0 6px 25px #49374444;font-size:13px;max-width:90%;text-align:center;animation:toastIn .25s ease}
 @keyframes toastIn{from{opacity:0;transform:translate(-50%,10px)}to{opacity:1;transform:translate(-50%,0)}}
+.password-recovery-overlay{position:fixed;inset:0;z-index:5000;background:#49374499;display:flex;align-items:center;justify-content:center;padding:20px}
+.password-recovery-card{width:100%;max-width:390px;background:#fff8fc;border:1px solid #f0d4e2;border-radius:25px;padding:22px;box-shadow:0 12px 40px #49374444}
+.password-recovery-card h2{margin:0 0 8px;color:#68465b}
+.password-recovery-card p{font-size:13px;line-height:1.5;color:#896b7e}
+.password-recovery-card button{width:100%;margin-top:9px}
 </style>
 </head>
 <body>
@@ -173,6 +179,13 @@ let supabaseClient=null;
 let currentUser=null;
 let authMessage="Проверяем подключение...";
 let authReady=false;
+let passwordRecoveryMode=false;
+
+function isPasswordRecoveryLink(){
+const query=new URLSearchParams(window.location.search);
+const hash=new URLSearchParams(window.location.hash.replace(/^#/,""));
+return query.get("type")==="recovery"||hash.get("type")==="recovery";
+}
 
 try{
 if(window.supabase&&window.supabase.createClient){
@@ -180,8 +193,16 @@ supabaseClient=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KE
 supabaseClient.auth.onAuthStateChange((event,session)=>{
 currentUser=session?.user||null;
 authReady=true;
+
 if(event==="SIGNED_IN")authMessage="Ты вошла в аккаунт! ♡";
 if(event==="SIGNED_OUT")authMessage="Ты вышла из аккаунта.";
+
+if(event==="PASSWORD_RECOVERY"){
+passwordRecoveryMode=true;
+authMessage="Подтверди новый пароль для своего аккаунта.";
+setTimeout(showPasswordRecoveryForm,100);
+}
+
 if(document.getElementById("authStatus"))renderAuthCard();
 });
 supabaseClient.auth.getSession().then(({data,error})=>{
@@ -189,6 +210,11 @@ if(error)authMessage="Не удалось проверить сессию: "+err
 currentUser=data?.session?.user||null;
 authReady=true;
 if(document.getElementById("authStatus"))renderAuthCard();
+
+if(isPasswordRecoveryLink()&&currentUser){
+passwordRecoveryMode=true;
+setTimeout(showPasswordRecoveryForm,300);
+}
 }).catch(()=>{
 authReady=true;
 authMessage="Не удалось подключиться к Supabase. Проверь интернет.";
@@ -222,6 +248,69 @@ account.innerHTML=`
 form.style.display="block";
 account.style.display="none";
 }
+}
+
+function showPasswordRecoveryForm(){
+if(!supabaseClient||!currentUser)return;
+let old=document.getElementById("passwordRecoveryModal");
+if(old)old.remove();
+
+const overlay=document.createElement("div");
+overlay.id="passwordRecoveryModal";
+overlay.className="password-recovery-overlay";
+overlay.innerHTML=`
+<div class="password-recovery-card">
+<h2>♡ Новый пароль</h2>
+<p>Придумай новый пароль для Roleplay Club. Введи его дважды, чтобы мы убедились, что нет ошибки.</p>
+<input class="field" id="newAccountPassword" type="password" autocomplete="new-password" placeholder="Новый пароль (минимум 6 символов)">
+<input class="field" id="confirmAccountPassword" type="password" autocomplete="new-password" placeholder="Повтори новый пароль">
+<div id="passwordRecoveryStatus" class="auth-status"></div>
+<button class="primary" id="saveNewPasswordButton" onclick="saveNewAccountPassword()">Сохранить новый пароль</button>
+<button class="action" onclick="closePasswordRecoveryForm()">Не сейчас</button>
+</div>`;
+document.body.appendChild(overlay);
+}
+
+function closePasswordRecoveryForm(){
+const modal=document.getElementById("passwordRecoveryModal");
+if(modal)modal.remove();
+}
+
+async function saveNewAccountPassword(){
+if(!supabaseClient){showToast("Supabase пока не подключён.");return}
+const password=document.getElementById("newAccountPassword")?.value||"";
+const confirmation=document.getElementById("confirmAccountPassword")?.value||"";
+const status=document.getElementById("passwordRecoveryStatus");
+const button=document.getElementById("saveNewPasswordButton");
+
+if(password.length<6){
+status.textContent="Пароль должен содержать минимум 6 символов.";
+return;
+}
+if(password!==confirmation){
+status.textContent="Пароли не совпадают. Проверь оба поля.";
+return;
+}
+
+button.disabled=true;
+button.textContent="Сохраняем...";
+status.textContent="Обновляем пароль...";
+const {data,error}=await supabaseClient.auth.updateUser({password});
+
+button.disabled=false;
+button.textContent="Сохранить новый пароль";
+
+if(error){
+status.textContent="Не удалось изменить пароль: "+error.message;
+return;
+}
+
+passwordRecoveryMode=false;
+authMessage="Пароль успешно изменён! ♡";
+currentUser=data?.user||currentUser;
+closePasswordRecoveryForm();
+if(document.getElementById("authStatus"))renderAuthCard();
+showToast("Новый пароль сохранён! ♡");
 }
 
 async function signUpAccount(){
@@ -359,6 +448,22 @@ if(Array.isArray(old[name])&&!chats.some(c=>c.title===name))chats.push({id:makeI
 saveChats();
 }catch(e){}
 function getChat(){return chats.find(c=>c.id===activeChatId)}
+
+/* Проверяем, открыт ли сейчас именно экран переписки */
+function isCharacterInActiveChat(name){
+const chat=getChat();
+const panel=document.getElementById("panel");
+const messages=document.getElementById("chatMessages");
+return !!(
+chat&&
+panel&&
+panel.style.display==="block"&&
+messages&&
+Array.isArray(chat.participants)&&
+chat.participants.includes(name)
+);
+}
+
 function unreadCount(){return notifications.filter(n=>!n.read).length}
 
 function openApp(name){
@@ -448,10 +553,16 @@ filtered.forEach(({c,i})=>{
 const favorite=favorites.includes(characterKey(c));
 const src=getAvatar(c);
 const avatar=src?`<img src="${escapeHTML(src)}" alt="">`:escapeHTML(c[2]);
+const inChat=isCharacterInActiveChat(c[0]);
 html+=`<div class="character-card">
 <div class="character-top">
 <div class="character-avatar">${avatar}</div>
-<div class="character-info"><strong>${escapeHTML(c[0])}</strong><small>${escapeHTML(c[1])}</small><small>${escapeHTML(c[3])}</small></div>
+<div class="character-info">
+<strong>${escapeHTML(c[0])}</strong>
+<small>${escapeHTML(c[1])}</small>
+<small>${escapeHTML(c[3])}</small>
+<small style="color:${inChat?"#65a17b":"#a18395"}">${inChat?"🟢 Сейчас в твоём чате":"⚪ Не в чате"}</small>
+</div>
 <button class="favorite" onclick="toggleFavorite(${i})">${favorite?"♥":"♡"}</button>
 </div>
 <div class="character-actions">
@@ -696,7 +807,7 @@ let html=`<button class="back" onclick="openApp('chats')">← К перепис�
 ${avatarHTML(person)}
 <div class="chat-header-info"><strong>${escapeHTML(chat.title)}</strong>
 <small>${chat.type==="group"?"Групповой чат · "+chat.participants.length+" участника(ов)":escapeHTML(chat.participants[0])}</small>
-<div class="chat-presence">${chat.type==="group"?"Группа создана":"Сейчас в твоём чате"}</div></div>
+<div class="chat-presence">${chat.type==="group"?"Участники сейчас в этой переписке":"Сейчас в твоём чате"}</div></div>
 </div>
 <div class="chat-tools">
 <button class="action" onclick="editMemory()">🧠 Память сюжета</button>
