@@ -1,5 +1,4 @@
 
-
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -76,6 +75,15 @@ button{border:0;cursor:pointer}
 .anilist-result-info small{display:block;color:#997b8d;margin-top:4px;font-size:12px}
 .anilist-result button{background:#f5e4ed;color:#805b73;border-radius:12px;padding:9px;font-size:12px}
 .anilist-status{font-size:13px;color:#805b73;margin:10px 2px;line-height:1.5}
+.catalog-source-box{background:#fff0f6;border:1px solid #f0d4e2;border-radius:20px;padding:14px;margin:14px 0}
+.catalog-source-box h3{margin:3px 0 7px}
+.catalog-source-box .primary{width:100%;margin-top:7px}
+.catalog-source-result{display:flex;gap:10px;align-items:center;background:#fff;border-radius:15px;padding:11px;margin:8px 0}
+.catalog-source-result img{width:55px;height:70px;object-fit:cover;border-radius:10px;flex-shrink:0}
+.catalog-source-result-info{flex:1;min-width:0}
+.catalog-source-result-info strong{display:block}
+.catalog-source-result-info small{display:block;color:#997b8d;margin-top:4px}
+.catalog-source-result button{background:#f5e4ed;color:#805b73;border-radius:12px;padding:9px;font-size:12px}
 </style>
 </head>
 <body>
@@ -136,6 +144,7 @@ let favorites=[];
 let catalogCategory="Все";
 let catalogSearch="";
 let anilistResults=[];
+let catalogSourceResults={wikidata:[],vndb:[]};
 
 try{
 const savedCharacters=JSON.parse(localStorage.getItem("roleplay_custom_characters")||"[]");
@@ -287,6 +296,24 @@ html+=`</div>
 <div id="aniResults"></div>
 </div>
 
+<div class="catalog-source-box">
+<h3>🎮 Поиск игровых персонажей</h3>
+<p class="note">Поиск по Wikidata. Это общая база, поэтому проверяй произведение в описании результата.</p>
+<input class="field" id="wikidataSearch" placeholder="Имя персонажа..." onkeydown="if(event.key==='Enter')searchCatalogSource('wikidata')">
+<button class="primary" id="wikidataButton" onclick="searchCatalogSource('wikidata')">🔎 Искать в Wikidata</button>
+<div id="wikidataStatus" class="anilist-status"></div>
+<div id="wikidataResults"></div>
+</div>
+
+<div class="catalog-source-box">
+<h3>📖 Поиск персонажей визуальных новелл</h3>
+<p class="note">Ищи героев по имени в базе VNDB.</p>
+<input class="field" id="vndbSearch" placeholder="Имя персонажа..." onkeydown="if(event.key==='Enter')searchCatalogSource('vndb')">
+<button class="primary" id="vndbButton" onclick="searchCatalogSource('vndb')">🔎 Искать в VNDB</button>
+<div id="vndbStatus" class="anilist-status"></div>
+<div id="vndbResults"></div>
+</div>
+
 <div id="characterList"></div>`;
 document.getElementById("panelContent").innerHTML=html;
 renderCharacterList();
@@ -400,6 +427,115 @@ characters.splice(index,1);
 saveCharacters();
 saveFavorites();
 renderCharacterList();
+}
+
+/* ПОИСК В WIKIDATA И VNDB */
+async function searchCatalogSource(source){
+const input=document.getElementById(source==="wikidata"?"wikidataSearch":"vndbSearch");
+const status=document.getElementById(source+"Status");
+const results=document.getElementById(source+"Results");
+const button=document.getElementById(source+"Button");
+
+if(!input||!status||!results||!button)return;
+
+const query=input.value.trim();
+if(!query){
+status.textContent="Сначала введи имя персонажа ♡";
+results.innerHTML="";
+return;
+}
+
+button.disabled=true;
+button.textContent="Ищем...";
+status.textContent=source==="wikidata"
+?"Ищем в Wikidata... 🎮"
+:"Ищем в VNDB... 📖";
+results.innerHTML="";
+
+try{
+const url="/api/catalog?source="+encodeURIComponent(source)+"&query="+encodeURIComponent(query);
+const response=await fetch(url);
+let data={};
+
+try{
+data=await response.json();
+}catch(e){
+throw new Error("Сервер вернул некорректный ответ.");
+}
+
+if(!response.ok){
+throw new Error(data.error||"Ошибка сервера. Проверь api/catalog.js.");
+}
+
+catalogSourceResults[source]=Array.isArray(data.results)?data.results:[];
+
+if(!catalogSourceResults[source].length){
+status.textContent="Ничего не найдено. Попробуй другое написание имени.";
+return;
+}
+
+status.textContent="Найдено результатов: "+catalogSourceResults[source].length+" ♡";
+
+let html="";
+catalogSourceResults[source].forEach((item,index)=>{
+const name=item.name||"Без имени";
+const description=item.description||"Описание отсутствует";
+const game=item.game||"";
+const image=item.image||"";
+
+html+=`<div class="catalog-source-result">
+${image?`<img src="${escapeHTML(image)}" alt="" loading="lazy">`:`<div class="character-avatar">${source==="wikidata"?"🎮":"📖"}</div>`}
+<div class="catalog-source-result-info">
+<strong>${escapeHTML(name)}</strong>
+<small>${escapeHTML(description)}</small>
+${game?`<small>Произведение: ${escapeHTML(game)}</small>`:""}
+<button onclick="addCatalogCharacter('${source}',${index})">＋ Добавить</button>
+</div>
+</div>`;
+});
+
+results.innerHTML=html;
+
+}catch(error){
+status.textContent="Не удалось выполнить поиск: "+(error.message||"неизвестная ошибка");
+}finally{
+button.disabled=false;
+button.textContent=source==="wikidata"?"🔎 Искать в Wikidata":"🔎 Искать в VNDB";
+}
+}
+
+function addCatalogCharacter(source,index){
+const item=catalogSourceResults[source]?.[index];
+if(!item)return;
+
+const name=(item.name||"").trim();
+if(!name){
+alert("У этого результата нет имени.");
+return;
+}
+
+const isGame=source==="wikidata";
+const category=isGame?"Игры":"Визуальные новеллы";
+const sourceTitle=item.game||(isGame?"Wikidata — проверь произведение":"Визуальная новелла (VNDB)");
+const emoji=isGame?"🎮":"📖";
+const image=item.image||"";
+
+if(characters.some(c=>
+c[0].toLowerCase()===name.toLowerCase()&&
+c[1].toLowerCase()===sourceTitle.toLowerCase()
+)){
+alert("Этот персонаж уже есть в каталоге ♡");
+return;
+}
+
+characters.push([name,sourceTitle,emoji,category,image]);
+saveCharacters();
+
+catalogCategory="Все";
+catalogSearch="";
+renderCharacterCatalog();
+
+alert("Персонаж добавлен в твою коллекцию! ♡");
 }
 
 /* ПОИСК ПЕРСОНАЖЕЙ ANILIST */
@@ -809,3 +945,5 @@ if(getChat()&&getChat().id===chat.id)renderChat();
 </script>
 </body>
 </html>
+
+
