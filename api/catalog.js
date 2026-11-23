@@ -1,110 +1,37 @@
 
-const https = require("https");
 
-let igdbToken = null;
-let igdbTokenExpires = 0;
+async function searchWikidata(query) {
+  const url = new URL("https://www.wikidata.org/w/api.php");
 
-function send(res, status, data) {
-  res.status(status).json(data);
-}
+  url.search = new URLSearchParams({
+    action: "wbsearchentities",
+    search: query,
+    language: "ru",
+    uselang: "ru",
+    type: "item",
+    limit: "10",
+    format: "json",
+    origin: "*"
+  }).toString();
 
-async function fetchJson(url, options = {}) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 12000);
+  const response = await fetch(url);
+  if (!response.ok) throw new Error("Wikidata временно недоступна");
 
-  try {
-    const response = await fetch(url, {
-      ...options,
-      signal: controller.signal
-    });
+  const data = await response.json();
 
-    const data = await response.json().catch(() => ({}));
-
-    if (!response.ok) {
-      throw new Error(
-        data.message || data.error || `Ошибка API: ${response.status}`
-      );
-    }
-
-    return data;
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
-async function getIgdbToken() {
-  if (igdbToken && Date.now() < igdbTokenExpires) {
-    return igdbToken;
-  }
-
-  const clientId = process.env.TWITCH_CLIENT_ID;
-  const clientSecret = process.env.TWITCH_CLIENT_SECRET;
-
-  if (!clientId || !clientSecret) {
-    throw new Error("Не настроены ключи IGDB в Vercel.");
-  }
-
-  const params = new URLSearchParams({
-    client_id: clientId,
-    client_secret: clientSecret,
-    grant_type: "client_credentials"
-  });
-
-  const data = await fetchJson(
-    "https://id.twitch.tv/oauth2/token",
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded"
-      },
-      body: params.toString()
-    }
-  );
-
-  igdbToken = data.access_token;
-  igdbTokenExpires = Date.now() + (data.expires_in - 300) * 1000;
-
-  return igdbToken;
-}
-
-async function searchIgdb(query) {
-  const clientId = process.env.TWITCH_CLIENT_ID;
-  const token = await getIgdbToken();
-
-  const body = `
-    search "${query.replace(/["\\]/g, "")}";
-    fields name, description, mug_shot.image_id, games.name;
-    limit 10;
-  `;
-
-  const data = await fetchJson(
-    "https://api.igdb.com/v4/characters",
-    {
-      method: "POST",
-      headers: {
-        "Client-ID": clientId,
-        "Authorization": `Bearer ${token}`,
-        "Content-Type": "text/plain"
-      },
-      body
-    }
-  );
-
-  return data.map(character => ({
-    id: `igdb_${character.id}`,
-    name: character.name,
-    description: character.description || "",
-    image: character.mug_shot?.image_id
-      ? `https://images.igdb.com/igdb/image/upload/t_cover_big/${character.mug_shot.image_id}.jpg`
-      : "",
-    source: "IGDB",
+  return (data.search || []).map(item => ({
+    id: "wikidata_" + item.id,
+    name: item.label || "",
+    description: item.description || "",
+    image: "",
+    source: "Wikidata",
     category: "Игры",
-    game: character.games?.[0]?.name || ""
+    game: ""
   }));
 }
 
 async function searchVndb(query) {
-  const data = await fetchJson(
+  const response = await fetch(
     "https://api.vndb.org/kana/character",
     {
       method: "POST",
@@ -120,8 +47,12 @@ async function searchVndb(query) {
     }
   );
 
+  if (!response.ok) throw new Error("VNDB временно недоступна");
+
+  const data = await response.json();
+
   return (data.results || []).map(character => ({
-    id: `vndb_${character.id}`,
+    id: "vndb_" + character.id,
     name: character.name,
     description: character.description || "",
     image: character.image?.url || "",
@@ -133,8 +64,8 @@ async function searchVndb(query) {
 
 module.exports = async (req, res) => {
   if (req.method !== "GET" && req.method !== "POST") {
-    return send(res, 405, {
-      error: "Метод не поддерживается."
+    return res.status(405).json({
+      error: "Метод не поддерживается"
     });
   }
 
@@ -151,35 +82,35 @@ module.exports = async (req, res) => {
   ).toLowerCase();
 
   if (!query) {
-    return send(res, 400, {
-      error: "Введи имя персонажа для поиска."
+    return res.status(400).json({
+      error: "Введи имя персонажа"
     });
   }
 
   try {
     let results;
 
-    if (source === "igdb") {
-      results = await searchIgdb(query);
+    if (source === "wikidata") {
+      results = await searchWikidata(query);
     } else if (source === "vndb") {
       results = await searchVndb(query);
     } else {
-      return send(res, 400, {
-        error: "Неизвестный источник поиска."
+      return res.status(400).json({
+        error: "Неизвестный источник"
       });
     }
 
-    return send(res, 200, {
+    return res.status(200).json({
       results,
       source,
       query
     });
 
   } catch (error) {
-    console.error("Catalog API error:", error);
+    console.error("Catalog error:", error);
 
-    return send(res, 500, {
-      error: error.message || "Не удалось выполнить поиск."
+    return res.status(500).json({
+      error: "Не удалось выполнить поиск. Попробуй ещё раз."
     });
   }
 };
