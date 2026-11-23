@@ -382,17 +382,31 @@ renderChat();
 }
 }
 
+
 function editMessage(index){
-const chat=getChat();
-if(!chat||!chat.messages[index]||chat.messages[index].role!=="user")return;
-const value=prompt("Измени своё сообщение:",chat.messages[index].content);
-if(value!==null&&value.trim()){
-chat.messages[index].content=value.trim();
-chat.messages=chat.messages.slice(0,index+1);
-saveChats();
-renderChat();
+  const chat=getChat();
+  if(!chat||!chat.messages[index]||chat.messages[index].role!=="user")return;
+
+  const value=prompt(
+    "Измени своё сообщение. Ответы персонажей после него будут удалены:",
+    chat.messages[index].content
+  );
+
+  if(value===null)return;
+
+  const newText=value.trim();
+  if(!newText){
+    alert("Сообщение не может быть пустым!");
+    return;
+  }
+
+  chat.messages[index].content=newText;
+  chat.messages=chat.messages.slice(0,index+1);
+
+  saveChats();
+  renderChat();
 }
-}
+
 
 
 function deleteMessage(index){
