@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -107,7 +108,7 @@ button{border:0;cursor:pointer}
 .catalog-source-result-info{flex:1;min-width:0}
 .catalog-source-result-info strong{display:block}
 .catalog-source-result-info small{display:block;color:#997b8d;margin-top:4px}
-.catalog-source-result button{background:#f5e4ed;color:#805b73;border-radius:12px;padding:9px;font-size:12px}
+.catalog-source-result button{background:#f5e4ed;color:#805b73;border-radius:12px;padding:9px;font-size:12px;margin-top:7px}
 .auth-card{background:#fff;border:1px solid #f0d4e2;border-radius:21px;padding:16px;margin:12px 0}
 .auth-card h3{margin:0 0 8px}
 .auth-status{font-size:13px;line-height:1.5;color:#805b73;margin:10px 2px}
@@ -189,16 +190,13 @@ supabaseClient=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KE
 supabaseClient.auth.onAuthStateChange((event,session)=>{
 currentUser=session?.user||null;
 authReady=true;
-
 if(event==="SIGNED_IN")authMessage="Ты вошла в аккаунт! ♡";
 if(event==="SIGNED_OUT")authMessage="Ты вышла из аккаунта.";
-
 if(event==="PASSWORD_RECOVERY"){
 passwordRecoveryMode=true;
 authMessage="Подтверди новый пароль для своего аккаунта.";
 setTimeout(showPasswordRecoveryForm,100);
 }
-
 if(document.getElementById("authStatus"))renderAuthCard();
 });
 supabaseClient.auth.getSession().then(({data,error})=>{
@@ -206,7 +204,6 @@ if(error)authMessage="Не удалось проверить сессию: "+err
 currentUser=data?.session?.user||null;
 authReady=true;
 if(document.getElementById("authStatus"))renderAuthCard();
-
 if(isPasswordRecoveryLink()&&currentUser){
 passwordRecoveryMode=true;
 setTimeout(showPasswordRecoveryForm,300);
@@ -250,7 +247,6 @@ function showPasswordRecoveryForm(){
 if(!supabaseClient||!currentUser)return;
 let old=document.getElementById("passwordRecoveryModal");
 if(old)old.remove();
-
 const overlay=document.createElement("div");
 overlay.id="passwordRecoveryModal";
 overlay.className="password-recovery-overlay";
@@ -278,67 +274,48 @@ const password=document.getElementById("newAccountPassword")?.value||"";
 const confirmation=document.getElementById("confirmAccountPassword")?.value||"";
 const status=document.getElementById("passwordRecoveryStatus");
 const button=document.getElementById("saveNewPasswordButton");
-
-if(password.length<6){
-status.textContent="Пароль должен содержать минимум 6 символов.";
-return;
-}
-if(password!==confirmation){
-status.textContent="Пароли не совпадают. Проверь оба поля.";
-return;
-}
-
-button.disabled=true;
-button.textContent="Сохраняем...";
-status.textContent="Обновляем пароль...";
+if(password.length<6){status.textContent="Пароль должен содержать минимум 6 символов.";return}
+if(password!==confirmation){status.textContent="Пароли не совпадают. Проверь оба поля.";return}
+button.disabled=true;button.textContent="Сохраняем...";status.textContent="Обновляем пароль...";
 const {data,error}=await supabaseClient.auth.updateUser({password});
-
-button.disabled=false;
-button.textContent="Сохранить новый пароль";
-
-if(error){
-status.textContent="Не удалось изменить пароль: "+error.message;
-return;
-}
-
-passwordRecoveryMode=false;
-authMessage="Пароль успешно изменён! ♡";
-currentUser=data?.user||currentUser;
+button.disabled=false;button.textContent="Сохранить новый пароль";
+if(error){status.textContent="Не удалось изменить пароль: "+error.message;return}
+passwordRecoveryMode=false;authMessage="Пароль успешно изменён! ♡";currentUser=data?.user||currentUser;
 closePasswordRecoveryForm();
 if(document.getElementById("authStatus"))renderAuthCard();
 showToast("Новый пароль сохранён! ♡");
 }
 
 async function signUpAccount(){
-if(!supabaseClient){alert("Supabase пока не подключён.");return;}
+if(!supabaseClient){alert("Supabase пока не подключён.");return}
 const email=document.getElementById("authEmail").value.trim();
 const password=document.getElementById("authPassword").value;
-if(!email||!password){authMessage="Введи электронную почту и пароль.";renderAuthCard();return;}
-if(password.length<6){authMessage="Пароль должен содержать минимум 6 символов.";renderAuthCard();return;}
+if(!email||!password){authMessage="Введи электронную почту и пароль.";renderAuthCard();return}
+if(password.length<6){authMessage="Пароль должен содержать минимум 6 символов.";renderAuthCard();return}
 authMessage="Создаём аккаунт...";renderAuthCard();
 const {data,error}=await supabaseClient.auth.signUp({email,password,options:{emailRedirectTo:"https://roleplay-club.vercel.app"}});
 if(error)authMessage="Не удалось зарегистрироваться: "+error.message;
-else if(data.session){currentUser=data.user;authMessage="Аккаунт создан! Ты вошла ♡";}
+else if(data.session){currentUser=data.user;authMessage="Аккаунт создан! Ты вошла ♡"}
 else authMessage="Аккаунт создан! Проверь почту и подтверди адрес по ссылке из письма. После подтверждения вернись на сайт и войди.";
 renderAuthCard();
 }
 
 async function signInAccount(){
-if(!supabaseClient){alert("Supabase пока не подключён.");return;}
+if(!supabaseClient){alert("Supabase пока не подключён.");return}
 const email=document.getElementById("authEmail").value.trim();
 const password=document.getElementById("authPassword").value;
-if(!email||!password){authMessage="Введи электронную почту и пароль.";renderAuthCard();return;}
+if(!email||!password){authMessage="Введи электронную почту и пароль.";renderAuthCard();return}
 authMessage="Входим в аккаунт...";renderAuthCard();
 const {data,error}=await supabaseClient.auth.signInWithPassword({email,password});
 if(error)authMessage="Не удалось войти: "+error.message;
-else{currentUser=data.user;authMessage="С возвращением! ♡";}
+else{currentUser=data.user;authMessage="С возвращением! ♡"}
 renderAuthCard();
 }
 
 async function resetAccountPassword(){
 if(!supabaseClient)return;
 const email=document.getElementById("authEmail").value.trim();
-if(!email){authMessage="Сначала введи электронную почту.";renderAuthCard();return;}
+if(!email){authMessage="Сначала введи электронную почту.";renderAuthCard();return}
 authMessage="Отправляем письмо...";renderAuthCard();
 const {error}=await supabaseClient.auth.resetPasswordForEmail(email,{redirectTo:"https://roleplay-club.vercel.app"});
 authMessage=error?"Ошибка: "+error.message:"Если аккаунт с такой почтой существует, письмо для сброса пароля отправлено.";
@@ -349,7 +326,7 @@ async function signOutAccount(){
 if(!supabaseClient)return;
 const {error}=await supabaseClient.auth.signOut();
 if(error)authMessage="Не удалось выйти: "+error.message;
-else{currentUser=null;authMessage="Ты вышла из аккаунта.";}
+else{currentUser=null;authMessage="Ты вышла из аккаунта."}
 renderAuthCard();
 }
 
@@ -367,7 +344,7 @@ let favorites=[];
 let catalogCategory="Все";
 let catalogSearch="";
 let anilistResults=[];
-let catalogSourceResults={wikidata:[],vndb:[]};
+let catalogSourceResults={wikidata:[],vndb:[],movies:[],romanceclub:[]};
 let avatarOverrides={};
 let notifications=[];
 let typingChatId=null;
@@ -376,7 +353,7 @@ let toastTimer=null;
 
 try{
 const savedCharacters=JSON.parse(localStorage.getItem("roleplay_custom_characters")||"[]");
-if(Array.isArray(savedCharacters))savedCharacters.forEach(c=>{if(Array.isArray(c)&&c.length>=4)characters.push(c);});
+if(Array.isArray(savedCharacters))savedCharacters.forEach(c=>{if(Array.isArray(c)&&c.length>=4)characters.push(c)});
 }catch(e){}
 try{
 const savedFavorites=JSON.parse(localStorage.getItem("roleplay_favorites")||"[]");
@@ -397,7 +374,7 @@ function saveFavorites(){localStorage.setItem("roleplay_favorites",JSON.stringif
 function saveAvatars(){localStorage.setItem("roleplay_character_avatars",JSON.stringify(avatarOverrides))}
 function saveNotifications(){localStorage.setItem("roleplay_notifications",JSON.stringify(notifications))}
 function getCharacter(name){return characters.find(c=>c[0]===name)}
-function getAvatar(c){return c?(avatarOverrides[characterKey(c)]||c[4]||""): ""}
+function getAvatar(c){return c?(avatarOverrides[characterKey(c)]||c[4]||""):""}
 function avatarHTML(c,cls="avatar"){
 if(!c)return `<div class="${cls}">💬</div>`;
 const src=getAvatar(c);
@@ -445,19 +422,11 @@ saveChats();
 }catch(e){}
 function getChat(){return chats.find(c=>c.id===activeChatId)}
 
-/* Проверяем, открыт ли сейчас именно экран переписки */
 function isCharacterInActiveChat(name){
 const chat=getChat();
 const panel=document.getElementById("panel");
 const messages=document.getElementById("chatMessages");
-return !!(
-chat&&
-panel&&
-panel.style.display==="block"&&
-messages&&
-Array.isArray(chat.participants)&&
-chat.participants.includes(name)
-);
+return !!(chat&&panel&&panel.style.display==="block"&&messages&&Array.isArray(chat.participants)&&chat.participants.includes(name));
 }
 
 function unreadCount(){return notifications.filter(n=>!n.read).length}
@@ -633,7 +602,7 @@ const ctx=canvas.getContext("2d");ctx.drawImage(image,0,0,canvas.width,canvas.he
 const data=canvas.toDataURL("image/jpeg",.76);
 avatarOverrides[characterKey(character)]=data;
 try{saveAvatars();renderCharacterList();showToast("Фотография персонажа обновлена ♡")}
-catch(e){delete avatarOverrides[characterKey(character)];alert("Не удалось сохранить фото. Возможно, в памяти браузера закончилось место. Попробуй другое, более маленькое изображение.");}
+catch(e){delete avatarOverrides[characterKey(character)];alert("Не удалось сохранить фото. Возможно, в памяти браузера закончилось место. Попробуй другое, более маленькое изображение.")}
 };
 image.onerror=()=>alert("Не удалось открыть это изображение.");
 image.src=reader.result;
@@ -931,10 +900,7 @@ const response=await fetch("/api/chat",{
 method:"POST",headers:{"Content-Type":"application/json"},
 body:JSON.stringify({
 character:chat.participants.join(", "),
-messages:chat.messages.slice(-30).map(m=>({
-role:m.role,
-content:m.content
-})),
+messages:chat.messages.slice(-30).map(m=>({role:m.role,content:m.content})),
 memory:chat.memory,
 group:chat.type==="group",
 participants:chat.participants
@@ -957,7 +923,6 @@ if(getChat()&&getChat().id===chat.id)renderChat();
 
 /* ===== КЛУБ РОМАНТИКИ ===== */
 if(!categories.includes("Клуб Романтики"))categories.push("Клуб Романтики");
-if(!catalogSourceResults.romanceclub)catalogSourceResults.romanceclub=[];
 const oldRenderCharacterCatalog=renderCharacterCatalog;
 renderCharacterCatalog=function(){
 oldRenderCharacterCatalog();
@@ -972,6 +937,7 @@ box.innerHTML=`
 <div id="romanceclubStatus" class="anilist-status"></div><div id="romanceclubResults"></div>`;
 list.parentNode.insertBefore(box,list);
 };
+
 const oldCatalogSearch=searchCatalogSource;
 searchCatalogSource=async function(source){
 if(source!=="romanceclub")return oldCatalogSearch(source);
@@ -994,6 +960,7 @@ ${item.image?`<img src="${escapeHTML(item.image)}" alt="" loading="lazy">`:`<div
 }catch(error){status.textContent="Ошибка поиска: "+(error.message||"неизвестная ошибка")}
 finally{button.disabled=false;button.textContent="🔎 Искать в Клубе Романтики"}
 };
+
 const oldAddCatalogCharacter=addCatalogCharacter;
 addCatalogCharacter=function(source,index){
 if(source!=="romanceclub")return oldAddCatalogCharacter(source,index);
@@ -1003,6 +970,128 @@ const game=item.game||"Клуб Романтики";
 if(characters.some(c=>c[0].toLowerCase()===name.toLowerCase()&&c[1].toLowerCase()===game.toLowerCase())){alert("Этот персонаж уже есть в каталоге ♡");return}
 characters.push([name,game,"💗","Клуб Романтики",item.image||""]);
 saveCharacters();catalogCategory="Все";catalogSearch="";renderCharacterCatalog();alert("Персонаж добавлен в твою коллекцию! ♡");
+};
+
+/* ===== ФИЛЬМЫ И СЕРИАЛЫ ===== */
+const renderCatalogWithRomance=renderCharacterCatalog;
+renderCharacterCatalog=function(){
+renderCatalogWithRomance();
+const list=document.getElementById("characterList");
+if(!list||document.getElementById("moviesCatalogBox"))return;
+
+const box=document.createElement("div");
+box.className="catalog-source-box";
+box.id="moviesCatalogBox";
+box.innerHTML=`
+<h3>🎬 Поиск персонажей из фильмов и сериалов</h3>
+<p class="note">Ищи персонажей кино и сериалов по имени. Поиск использует Wikidata. У некоторых результатов могут отсутствовать фотографии или подробные описания.</p>
+<input class="field" id="moviesSearch" placeholder="Например: Wednesday Addams..." onkeydown="if(event.key==='Enter')searchCatalogSource('movies')">
+<button class="primary" id="moviesButton" onclick="searchCatalogSource('movies')">🔎 Найти персонажа</button>
+<div id="moviesStatus" class="anilist-status"></div>
+<div id="moviesResults"></div>`;
+
+list.parentNode.insertBefore(box,list);
+};
+
+const searchWithRomance=searchCatalogSource;
+searchCatalogSource=async function(source){
+if(source!=="movies")return searchWithRomance(source);
+
+const input=document.getElementById("moviesSearch");
+const status=document.getElementById("moviesStatus");
+const results=document.getElementById("moviesResults");
+const button=document.getElementById("moviesButton");
+
+if(!input||!status||!results||!button)return;
+
+const query=input.value.trim();
+if(!query){
+status.textContent="Сначала введи имя персонажа ♡";
+results.innerHTML="";
+return;
+}
+
+button.disabled=true;
+button.textContent="Ищем...";
+status.textContent="Ищем персонажей фильмов и сериалов... 🎬";
+results.innerHTML="";
+
+try{
+const response=await fetch("/api/catalog?source=movies&query="+encodeURIComponent(query));
+let data={};
+try{data=await response.json()}catch(e){throw new Error("Сервер вернул некорректный ответ.")}
+
+if(!response.ok)throw new Error(data.error||"Ошибка поиска. Проверь api/catalog.js.");
+
+catalogSourceResults.movies=Array.isArray(data.results)?data.results:[];
+
+if(!catalogSourceResults.movies.length){
+status.textContent="Ничего не найдено. Попробуй другое написание имени.";
+return;
+}
+
+status.textContent="Найдено результатов: "+catalogSourceResults.movies.length+" ♡";
+
+results.innerHTML=catalogSourceResults.movies.map((item,index)=>{
+const name=item.name||"Без имени";
+const description=item.description||"Описание отсутствует";
+const image=item.image||"";
+
+return `<div class="catalog-source-result">
+${image?`<img src="${escapeHTML(image)}" alt="" loading="lazy">`:`<div class="character-avatar">🎬</div>`}
+<div class="catalog-source-result-info">
+<strong>${escapeHTML(name)}</strong>
+<small>${escapeHTML(description)}</small>
+<small>Источник: Wikidata</small>
+<button onclick="addCatalogCharacter('movies',${index})">＋ Добавить в каталог</button>
+</div>
+</div>`;
+}).join("");
+
+}catch(error){
+status.textContent="Не удалось выполнить поиск: "+(error.message||"неизвестная ошибка");
+}finally{
+button.disabled=false;
+button.textContent="🔎 Найти персонажа";
+}
+};
+
+const addWithRomance=addCatalogCharacter;
+addCatalogCharacter=function(source,index){
+if(source!=="movies")return addWithRomance(source,index);
+
+const item=catalogSourceResults.movies?.[index];
+if(!item)return;
+
+const name=(item.name||"").trim();
+if(!name){
+alert("У этого результата нет имени.");
+return;
+}
+
+const sourceTitle="Фильмы и сериалы";
+
+if(characters.some(c=>
+c[0].toLowerCase()===name.toLowerCase()&&
+c[1].toLowerCase()===sourceTitle.toLowerCase()
+)){
+alert("Этот персонаж уже есть в каталоге ♡");
+return;
+}
+
+characters.push([
+name,
+sourceTitle,
+"🎬",
+"Фильмы и сериалы",
+item.image||""
+]);
+
+saveCharacters();
+catalogCategory="Фильмы и сериалы";
+catalogSearch="";
+renderCharacterCatalog();
+showToast("Персонаж добавлен в коллекцию! ♡");
 };
 
 /* ===== АВТОРИЗАЦИЯ В НАСТРОЙКАХ ===== */
