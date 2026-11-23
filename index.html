@@ -10,7 +10,7 @@
 <style>
 *{box-sizing:border-box}
 body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f5dce8;color:#493744}
-button,input,textarea{font:inherit}
+button,input,textarea,select{font:inherit}
 button{border:0;cursor:pointer}
 .phone{min-height:100vh;max-width:480px;margin:auto;background:linear-gradient(145deg,#fce8f0,#e9c9dc);position:relative;overflow:hidden}
 .status{height:35px;padding:12px 24px 0;display:flex;justify-content:space-between;font-size:12px;font-weight:700}
@@ -51,6 +51,20 @@ button{border:0;cursor:pointer}
 .composer{display:flex;gap:7px;position:sticky;bottom:0;background:#fff8fc;padding:10px 0}
 .composer input{min-width:0;flex:1;border:1px solid #e6c5d7;border-radius:22px;padding:12px}
 .row{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.catalog-search{margin:12px 0}
+.category-list{display:flex;gap:7px;overflow-x:auto;padding:5px 0 12px;scrollbar-width:none}
+.category-list button{white-space:nowrap;border-radius:20px;padding:9px 13px;background:#f5e4ed;color:#805b73;font-size:12px}
+.category-list button.active{background:#e9c4d8;color:#583b4e;font-weight:700}
+.character-card{background:#fff;border-radius:20px;padding:14px;margin:10px 0;box-shadow:0 3px 12px #9d6d8910}
+.character-top{display:flex;align-items:center;gap:12px}
+.character-avatar{width:54px;height:54px;border-radius:18px;background:#f5e4ed;display:grid;place-items:center;font-size:27px;flex-shrink:0}
+.character-info{flex:1;min-width:0}
+.character-info strong{display:block}
+.character-info small{display:block;color:#997b8d;margin-top:4px}
+.favorite{background:#fff0f5;color:#a45b7d;border-radius:14px;padding:9px;font-size:18px}
+.character-actions{display:flex;gap:7px;margin-top:12px}
+.character-actions button{flex:1}
+.empty{text-align:center;padding:24px 12px;color:#96778a;font-size:13px}
 </style>
 </head>
 <body>
@@ -94,23 +108,52 @@ button{border:0;cursor:pointer}
 </div>
 
 <script>
-const characters=[
-["Натаниэль Говард","Тени Сентфора 2","🖤"],
-["Надин","Тени Сентфора 2","🌹"],
-["Декс","Тени Сентфора 2","⭐"],
-["Руди","Тени Сентфора 2","🌙"],
-["BB","Big Bad Dogs","🐾"]
+const categories=[
+"Все","Избранное","Визуальные новеллы","Игры",
+"Аниме и манга","Фильмы и сериалы","Книги","Оригинальные"
 ];
+
+const characters=[
+["Натаниэль Говард","Тени Сентфора 2","🖤","Визуальные новеллы"],
+["Надин","Тени Сентфора 2","🌹","Визуальные новеллы"],
+["Декс","Тени Сентфора 2","⭐","Визуальные новеллы"],
+["Руди","Тени Сентфора 2","🌙","Визуальные новеллы"],
+["BB","Big Bad Dogs","🐾","Визуальные новеллы"]
+];
+
+let favorites=[];
+let catalogCategory="Все";
+let catalogSearch="";
+
+try{
+const savedCharacters=JSON.parse(localStorage.getItem("roleplay_custom_characters")||"[]");
+if(Array.isArray(savedCharacters)){
+savedCharacters.forEach(c=>{
+if(Array.isArray(c)&&c.length>=4)characters.push(c);
+});
+}
+}catch(e){}
+
+try{
+const savedFavorites=JSON.parse(localStorage.getItem("roleplay_favorites")||"[]");
+if(Array.isArray(savedFavorites))favorites=savedFavorites;
+}catch(e){}
+
+function characterKey(c){return c[0]+"|||"+c[1]}
+
+function saveCharacters(){
+localStorage.setItem("roleplay_custom_characters",JSON.stringify(characters.slice(5)));
+}
+
+function saveFavorites(){
+localStorage.setItem("roleplay_favorites",JSON.stringify(favorites));
+}
 
 function updateTime(){
 const now=new Date();
-const time=now.toLocaleTimeString('ru-RU',{
-hour:'2-digit',minute:'2-digit'
-});
+const time=now.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});
 document.getElementById('clock').textContent=time;
-document.getElementById('date').textContent=now.toLocaleDateString('ru-RU',{
-weekday:'long',day:'numeric',month:'long'
-});
+document.getElementById('date').textContent=now.toLocaleDateString('ru-RU',{weekday:'long',day:'numeric',month:'long'});
 document.getElementById('statusTime').textContent=time;
 }
 updateTime();
@@ -154,10 +197,7 @@ try{
 const old=JSON.parse(localStorage.getItem("roleplay_chats")||"{}");
 for(const name in old){
 if(Array.isArray(old[name])&&!chats.some(c=>c.title===name)){
-chats.push({
-id:makeId(),title:name,type:"private",
-participants:[name],messages:old[name],memory:""
-});
+chats.push({id:makeId(),title:name,type:"private",participants:[name],messages:old[name],memory:""});
 }
 }
 saveChats();
@@ -199,12 +239,9 @@ html+="</div>";
 }
 
 if(name==="characters"){
-html+='<p class="note">Выбери персонажа, чтобы начать новую историю ♡</p>';
-characters.forEach((c,i)=>{
-html+=`<button class="item chat" style="width:100%;text-align:left" onclick="createPrivate(${i})">
-<div class="avatar">${c[2]}</div><div><strong>${escapeHTML(c[0])}</strong><small>${escapeHTML(c[1])}</small></div></button>`;
-});
-html+='<button class="primary" onclick="openApp(\'chats\')">Мои переписки</button>';
+renderCharacterCatalog();
+panel.style.display="block";
+return;
 }
 
 if(!["chats","characters"].includes(name)){
@@ -214,6 +251,128 @@ content.innerHTML=html;
 panel.style.display="block";
 }
 
+/* КАТАЛОГ ПЕРСОНАЖЕЙ */
+function renderCharacterCatalog(){
+let html=`
+<p class="note">Твоя коллекция персонажей из разных миров. Ищи любимых или добавляй собственных ♡</p>
+<input class="field catalog-search" id="characterSearch" placeholder="🔎 Найти персонажа или произведение..." value="${escapeHTML(catalogSearch)}" oninput="catalogSearch=this.value;renderCharacterList()">
+<div class="category-list">`;
+categories.forEach(cat=>{
+html+=`<button class="${catalogCategory===cat?"active":""}" onclick="setCatalogCategory('${cat}')">${cat}</button>`;
+});
+html+=`</div>
+<button class="primary" onclick="showAddCharacter()">＋ Добавить своего персонажа</button>
+<div id="characterList"></div>`;
+document.getElementById("panelContent").innerHTML=html;
+renderCharacterList();
+}
+
+function setCatalogCategory(category){
+catalogCategory=category;
+renderCharacterCatalog();
+}
+
+function renderCharacterList(){
+const list=document.getElementById("characterList");
+if(!list)return;
+
+const search=catalogSearch.trim().toLowerCase();
+const filtered=characters.map((c,i)=>({c,i})).filter(({c})=>{
+const isFavorite=favorites.includes(characterKey(c));
+const categoryMatch=
+catalogCategory==="Все"||
+(catalogCategory==="Избранное"&&isFavorite)||
+c[3]===catalogCategory;
+const searchMatch=!search||
+(c[0]+" "+c[1]+" "+c[3]).toLowerCase().includes(search);
+return categoryMatch&&searchMatch;
+});
+
+if(!filtered.length){
+list.innerHTML='<div class="empty">Здесь пока никого нет ♡<br>Можешь добавить персонажа самостоятельно.</div>';
+return;
+}
+
+let html="";
+filtered.forEach(({c,i})=>{
+const favorite=favorites.includes(characterKey(c));
+html+=`<div class="character-card">
+<div class="character-top">
+<div class="character-avatar">${escapeHTML(c[2])}</div>
+<div class="character-info">
+<strong>${escapeHTML(c[0])}</strong>
+<small>${escapeHTML(c[1])}</small>
+<small>${escapeHTML(c[3])}</small>
+</div>
+<button class="favorite" onclick="toggleFavorite(${i})">${favorite?"♥":"♡"}</button>
+</div>
+<div class="character-actions">
+<button class="primary" onclick="createPrivate(${i})">Написать</button>
+${i>=5?`<button class="action" onclick="removeCustomCharacter(${i})">Удалить</button>`:""}
+</div>
+</div>`;
+});
+list.innerHTML=html;
+}
+
+function toggleFavorite(index){
+const key=characterKey(characters[index]);
+if(favorites.includes(key)){
+favorites=favorites.filter(x=>x!==key);
+}else{
+favorites.push(key);
+}
+saveFavorites();
+renderCharacterList();
+}
+
+function showAddCharacter(){
+document.getElementById("characterList").innerHTML=`
+<div class="item">
+<h3>Новый персонаж ♡</h3>
+<input class="field" id="newCharName" placeholder="Имя персонажа">
+<input class="field" id="newCharSource" placeholder="Из какого произведения?">
+<input class="field" id="newCharEmoji" placeholder="Эмодзи для аватара" maxlength="8">
+<select class="field" id="newCharCategory">
+${categories.slice(2).map(c=>`<option value="${c}">${c}</option>`).join("")}
+</select>
+<button class="primary" onclick="addCustomCharacter()">Сохранить персонажа</button>
+<button class="action" onclick="renderCharacterList()">Отмена</button>
+<p class="note">Это твой собственный персонаж. Его данные сохранятся на этом устройстве.</p>
+</div>`;
+}
+
+function addCustomCharacter(){
+const name=document.getElementById("newCharName").value.trim();
+const source=document.getElementById("newCharSource").value.trim()||"Авторский персонаж";
+const emoji=document.getElementById("newCharEmoji").value.trim()||"✨";
+const category=document.getElementById("newCharCategory").value;
+if(!name){
+alert("Напиши имя персонажа!");
+return;
+}
+if(characters.some(c=>c[0].toLowerCase()===name.toLowerCase()&&c[1].toLowerCase()===source.toLowerCase())){
+alert("Такой персонаж уже есть в каталоге.");
+return;
+}
+characters.push([name,source,emoji,category]);
+saveCharacters();
+catalogCategory="Все";
+catalogSearch="";
+renderCharacterCatalog();
+}
+
+function removeCustomCharacter(index){
+if(index<5)return;
+if(!confirm("Удалить этого персонажа из каталога?"))return;
+const removed=characters[index];
+favorites=favorites.filter(x=>x!==characterKey(removed));
+characters.splice(index,1);
+saveCharacters();
+saveFavorites();
+renderCharacterList();
+}
+
 function chooseNewChat(){
 openApp("characters");
 }
@@ -221,7 +380,7 @@ openApp("characters");
 function chooseGroup(){
 let html='<h2>Новый групповой чат 💬</h2><p class="note">Выбери участников группы.</p>';
 characters.forEach((c,i)=>{
-html+=`<label class="item" style="display:block"><input type="checkbox" class="groupChoice" value="${i}"> ${c[2]} ${escapeHTML(c[0])}</label>`;
+html+=`<label class="item" style="display:block"><input type="checkbox" class="groupChoice" value="${i}"> ${escapeHTML(c[2])} ${escapeHTML(c[0])}</label>`;
 });
 html+='<input class="field" id="groupName" placeholder="Название группового чата">';
 html+='<button class="primary" onclick="createGroup()">Создать группу</button>';
@@ -242,6 +401,12 @@ renderChat();
 
 function createPrivate(index){
 const c=characters[index];
+const existing=chats.find(x=>x.type==="private"&&x.participants?.[0]===c[0]);
+if(existing){
+activeChatId=existing.id;
+renderChat();
+return;
+}
 const chat={id:makeId(),title:c[0],type:"private",participants:[c[0]],messages:[],memory:""};
 chats.push(chat);
 saveChats();
@@ -332,15 +497,8 @@ const message=chat.messages[index];
 if(!message)return;
 const mine=message.role==="user";
 
-let html=`<div id="messageMenu" style="
-position:fixed;inset:0;background:#49374455;
-z-index:1000;display:flex;align-items:center;
-justify-content:center;padding:25px"
-onclick="closeMessageMenu()">
-<div style="background:#fff8fc;padding:20px;
-border-radius:22px;width:100%;max-width:300px;
-box-shadow:0 8px 30px #49374433"
-onclick="event.stopPropagation()">
+let html=`<div id="messageMenu" style="position:fixed;inset:0;background:#49374455;z-index:1000;display:flex;align-items:center;justify-content:center;padding:25px" onclick="closeMessageMenu()">
+<div style="background:#fff8fc;padding:20px;border-radius:22px;width:100%;max-width:300px;box-shadow:0 8px 30px #49374433" onclick="event.stopPropagation()">
 <strong>Действия с сообщением</strong>
 <div class="row" style="margin-top:15px">
 ${mine?`<button class="action" onclick="editMessage(selectedMessageIndex);closeMessageMenu()">✏️ Изменить</button>`:""}
@@ -350,7 +508,6 @@ ${!mine?`<button class="action" onclick="regenerate(selectedMessageIndex);closeM
 </div>
 <button class="back" style="margin-top:12px" onclick="closeMessageMenu()">Закрыть</button>
 </div></div>`;
-
 document.body.insertAdjacentHTML("beforeend",html);
 }
 
@@ -383,99 +540,67 @@ renderChat();
 }
 }
 
-/* Редактирование своего сообщения */
 async function editMessage(index){
 const chat=getChat();
 if(!chat||!chat.messages[index]||chat.messages[index].role!=="user")return;
 if(busy)return;
-
-const value=prompt(
-"Измени своё сообщение. Ответы персонажей после него будут удалены:",
-chat.messages[index].content
-);
-
+const value=prompt("Измени своё сообщение. Ответы персонажей после него будут удалены:",chat.messages[index].content);
 if(value===null)return;
-
 const newText=value.trim();
-if(!newText){
-alert("Сообщение не может быть пустым!");
-return;
-}
-
+if(!newText){alert("Сообщение не может быть пустым!");return;}
 chat.messages[index].content=newText;
 chat.messages=chat.messages.slice(0,index+1);
-
 saveChats();
 renderChat();
-
 await askAI(chat);
 }
 
-/* Удаление сообщения */
 function deleteMessage(index){
 const chat=getChat();
 if(!chat)return;
-
 const message=chat.messages[index];
-if(!message)return;
-if(busy)return;
-
+if(!message||busy)return;
 if(!confirm("Удалить сообщение и связанный с ним ответ?"))return;
-
 if(message.role==="user"&&chat.messages[index+1]?.role==="assistant"){
 chat.messages.splice(index,2);
 }else{
 chat.messages.splice(index,1);
 }
-
 saveChats();
 renderChat();
 }
 
-/* Повторная генерация ответа */
 async function regenerate(index){
 const chat=getChat();
 if(!chat||busy)return;
 if(!chat.messages[index]||chat.messages[index].role!=="assistant")return;
-
 chat.messages=chat.messages.slice(0,index);
 saveChats();
 renderChat();
 await askAI(chat);
 }
 
-/* Отправка сообщения */
 async function sendChat(event){
 event.preventDefault();
 if(busy)return;
-
 const input=document.getElementById("chatInput");
 if(!input)return;
-
 const message=input.value.trim();
 const chat=getChat();
-
 if(!message||!chat)return;
-
 chat.messages.push({role:"user",content:message});
 saveChats();
 renderChat();
-
 await askAI(chat);
 }
 
-/* Связь с ИИ через сервер */
 async function askAI(chat){
 if(busy)return;
-
 busy=true;
-
 const status=document.getElementById("chatStatus");
 if(status)status.textContent="Персонаж печатает... 💭";
-
 const button=document.getElementById("sendButton");
 if(button)button.disabled=true;
-
 try{
 const response=await fetch("/api/chat",{
 method:"POST",
@@ -488,39 +613,20 @@ group:chat.type==="group",
 participants:chat.participants
 })
 });
-
 const data=await response.json();
-
-if(!response.ok){
-throw new Error(data.error||"Ошибка сервера");
-}
-
-if(!data.reply){
-throw new Error("ИИ прислал пустой ответ");
-}
-
-chat.messages.push({
-role:"assistant",
-content:data.reply
-});
-
+if(!response.ok)throw new Error(data.error||"Ошибка сервера");
+if(!data.reply)throw new Error("ИИ прислал пустой ответ");
+chat.messages.push({role:"assistant",content:data.reply});
 saveChats();
-
 }catch(error){
-chat.messages.push({
-role:"assistant",
-content:"Не удалось получить ответ: "+error.message
-});
+chat.messages.push({role:"assistant",content:"Не удалось получить ответ: "+error.message});
 saveChats();
-
 }finally{
 busy=false;
-
-if(getChat()&&getChat().id===chat.id){
-renderChat();
-}
+if(getChat()&&getChat().id===chat.id)renderChat();
 }
 }
 </script>
 </body>
 </html>
+
