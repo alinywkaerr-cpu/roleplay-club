@@ -941,7 +941,165 @@ saveChats();
 busy=false;
 if(getChat()&&getChat().id===chat.id)renderChat();
 }
+} 
+  
+/* ===== ДОПОЛНЕНИЕ: КЛУБ РОМАНТИКИ ===== */
+
+if (!categories.includes("Клуб Романтики")) {
+  categories.push("Клуб Романтики");
 }
+
+if (!catalogSourceResults.romanceclub) {
+  catalogSourceResults.romanceclub = [];
+}
+
+const oldRenderCharacterCatalog = renderCharacterCatalog;
+
+renderCharacterCatalog = function() {
+  oldRenderCharacterCatalog();
+
+  const list = document.getElementById("characterList");
+  if (!list || document.getElementById("romanceClubBox")) return;
+
+  const box = document.createElement("div");
+  box.className = "catalog-source-box";
+  box.id = "romanceClubBox";
+
+  box.innerHTML = `
+    <h3>💗 Поиск по Клубу Романтики</h3>
+    <p class="note">Ищи персонажей из историй КР по имени.</p>
+    <input class="field" id="romanceclubSearch"
+      placeholder="Например: Александр..."
+      onkeydown="if(event.key==='Enter')searchCatalogSource('romanceclub')">
+    <button class="primary" id="romanceclubButton"
+      onclick="searchCatalogSource('romanceclub')">
+      🔎 Искать в Клубе Романтики
+    </button>
+    <div id="romanceclubStatus" class="anilist-status"></div>
+    <div id="romanceclubResults"></div>
+  `;
+
+  list.parentNode.insertBefore(box, list);
+};
+
+const oldCatalogSearch = searchCatalogSource;
+
+searchCatalogSource = async function(source) {
+  if (source !== "romanceclub") {
+    return oldCatalogSearch(source);
+  }
+
+  const input = document.getElementById("romanceclubSearch");
+  const status = document.getElementById("romanceclubStatus");
+  const results = document.getElementById("romanceclubResults");
+  const button = document.getElementById("romanceclubButton");
+
+  const query = input?.value.trim();
+
+  if (!query) {
+    status.textContent = "Сначала введи имя персонажа ♡";
+    results.innerHTML = "";
+    return;
+  }
+
+  button.disabled = true;
+  button.textContent = "Ищем...";
+  status.textContent = "Ищем персонажей КР... 💗";
+  results.innerHTML = "";
+
+  try {
+    const url = "/api/catalog?source=romanceclub&query=" +
+      encodeURIComponent(query);
+
+    const response = await fetch(url);
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || "Ошибка поиска");
+    }
+
+    catalogSourceResults.romanceclub =
+      Array.isArray(data.results) ? data.results : [];
+
+    if (!catalogSourceResults.romanceclub.length) {
+      status.textContent =
+        "Ничего не найдено. Попробуй другое написание имени.";
+      return;
+    }
+
+    status.textContent =
+      "Найдено персонажей: " +
+      catalogSourceResults.romanceclub.length + " ♡";
+
+    results.innerHTML = catalogSourceResults.romanceclub
+      .map((item, index) => `
+        <div class="catalog-source-result">
+          ${
+            item.image
+              ? `<img src="${escapeHTML(item.image)}" alt="" loading="lazy">`
+              : `<div class="character-avatar">💗</div>`
+          }
+          <div class="catalog-source-result-info">
+            <strong>${escapeHTML(item.name || "Без имени")}</strong>
+            <small>${escapeHTML(item.description || "Персонаж Клуба Романтики")}</small>
+            <small>Клуб Романтики</small>
+            <button onclick="addCatalogCharacter('romanceclub',${index})">
+              ＋ Добавить
+            </button>
+          </div>
+        </div>
+      `).join("");
+
+  } catch (error) {
+    status.textContent =
+      "Ошибка поиска: " + (error.message || "неизвестная ошибка");
+  } finally {
+    button.disabled = false;
+    button.textContent = "🔎 Искать в Клубе Романтики";
+  }
+};
+
+const oldAddCatalogCharacter = addCatalogCharacter;
+
+addCatalogCharacter = function(source, index) {
+  if (source !== "romanceclub") {
+    return oldAddCatalogCharacter(source, index);
+  }
+
+  const item = catalogSourceResults.romanceclub?.[index];
+  if (!item) return;
+
+  const name = (item.name || "").trim();
+  if (!name) return;
+
+  const game = item.game || "Клуб Романтики";
+
+  if (characters.some(c =>
+    c[0].toLowerCase() === name.toLowerCase() &&
+    c[1].toLowerCase() === game.toLowerCase()
+  )) {
+    alert("Этот персонаж уже есть в каталоге ♡");
+    return;
+  }
+
+  characters.push([
+    name,
+    game,
+    "💗",
+    "Клуб Романтики",
+    item.image || ""
+  ]);
+
+  saveCharacters();
+  catalogCategory = "Все";
+  catalogSearch = "";
+  renderCharacterCatalog();
+
+  alert("Персонаж добавлен в твою коллекцию! ♡");
+};
+
+/* ===== КОНЕЦ ДОПОЛНЕНИЯ ===== */
+
 </script>
 </body>
 </html>
