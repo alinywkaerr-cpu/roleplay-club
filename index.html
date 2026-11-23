@@ -1,5 +1,4 @@
 
-
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -1014,32 +1013,94 @@ const message=input.value.trim(),chat=getChat();if(!message||!chat)return;
 chat.messages.push({role:"user",content:message,createdAt:new Date().toISOString()});
 saveChats();renderChat();await askAI(chat);
 }
+
+/* ===== ИИ: ПЕРЕДАЧА АНКЕТ ПЕРСОНАЖЕЙ И ПАМЯТИ СЮЖЕТА ===== */
 async function askAI(chat){
 if(busy)return;
-busy=true;typingChatId=chat.id;
+
+busy=true;
+typingChatId=chat.id;
+
 if(getChat()&&getChat().id===chat.id)renderChat();
+
 try{
+/*
+  Собираем анкеты участников.
+  Профили в localStorage хранятся по ключу:
+  "Имя персонажа|||Название произведения".
+  Сервер получает объект profiles, где ключ — имя персонажа.
+*/
+const profiles={};
+
+for(const name of chat.participants||[]){
+const character=characters.find(c=>c[0]===name);
+if(!character)continue;
+
+const profile=characterProfiles[characterKey(character)];
+if(!profile)continue;
+
+profiles[name]={
+description:profile.description||"",
+age:profile.age||"",
+appearance:profile.appearance||"",
+personality:profile.personality||"",
+speech:profile.speech||"",
+habits:profile.habits||"",
+backstory:profile.backstory||""
+};
+}
+
 const response=await fetch("/api/chat",{
-method:"POST",headers:{"Content-Type":"application/json"},
+method:"POST",
+headers:{"Content-Type":"application/json"},
 body:JSON.stringify({
-character:chat.participants.join(", "),
-messages:chat.messages.slice(-30).map(m=>({role:m.role,content:m.content})),
-memory:chat.memory,
+character:(chat.participants||[]).join(", "),
+messages:chat.messages.slice(-40).map(m=>({
+role:m.role,
+content:m.content
+})),
+memory:chat.memory||"",
 group:chat.type==="group",
-participants:chat.participants
+participants:chat.participants||[],
+profiles:profiles
 })
 });
-const data=await response.json();
-if(!response.ok)throw new Error(data.error||"Ошибка сервера");
-if(!data.reply)throw new Error("ИИ прислал пустой ответ");
-chat.messages.push({role:"assistant",content:data.reply,createdAt:new Date().toISOString()});
-saveChats();addNotification(chat,data.reply);
+
+let data={};
+try{
+data=await response.json();
 }catch(error){
-const errorText="Не удалось получить ответ: "+error.message;
-chat.messages.push({role:"assistant",content:errorText,createdAt:new Date().toISOString()});
-saveChats();addNotification(chat,errorText);
+throw new Error("Сервер вернул некорректный ответ.");
+}
+
+if(!response.ok)throw new Error(data.error||"Ошибка сервера");
+if(!data.reply||!String(data.reply).trim())throw new Error("ИИ прислал пустой ответ");
+
+chat.messages.push({
+role:"assistant",
+content:String(data.reply).trim(),
+createdAt:new Date().toISOString()
+});
+
+saveChats();
+addNotification(chat,data.reply);
+
+}catch(error){
+const errorText="Не удалось получить ответ: "+(error.message||"неизвестная ошибка");
+
+chat.messages.push({
+role:"assistant",
+content:errorText,
+createdAt:new Date().toISOString()
+});
+
+saveChats();
+addNotification(chat,errorText);
+
 }finally{
-busy=false;typingChatId=null;
+busy=false;
+typingChatId=null;
+
 if(getChat()&&getChat().id===chat.id)renderChat();
 }
 }
