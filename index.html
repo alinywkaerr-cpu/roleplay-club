@@ -1,4 +1,5 @@
 
+
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -141,6 +142,26 @@ button{border:0;cursor:pointer}
 .profile-buttons{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
 .profile-buttons button{flex:1;min-width:100px}
 .profile-hint{font-size:12px;color:#a18395;line-height:1.5;margin:10px 2px}
+
+/* ===== АВТОДОСЬЕ ===== */
+.dossier-box{background:linear-gradient(145deg,#fff0f6,#f9e3ed);border:1px solid #efd0df;border-radius:22px;padding:15px;margin:15px 0}
+.dossier-box h3{margin:0 0 8px;color:#805b73;font-size:16px}
+.dossier-box .field{margin:6px 0}
+.dossier-search-button{width:100%;margin-top:8px}
+.dossier-status{font-size:13px;line-height:1.5;color:#805b73;margin:10px 2px;white-space:pre-wrap}
+.dossier-draft{background:#fff;border:1px solid #efd6e3;border-radius:17px;padding:12px;margin:10px 0}
+.dossier-draft h4{margin:0 0 8px;color:#805b73;font-size:14px}
+.dossier-draft textarea{width:100%;min-height:90px;resize:vertical;border:1px solid #ead0dd;border-radius:12px;padding:10px;background:#fffafd;color:#493744;font:inherit;font-size:13px;line-height:1.5}
+.dossier-apply{display:flex;align-items:flex-start;gap:8px;font-size:12px;line-height:1.4;color:#805b73;margin:9px 0}
+.dossier-apply input{margin-top:2px;accent-color:#c27d9f;flex-shrink:0}
+.dossier-warning{font-size:11px;color:#ad718d;margin:6px 0;line-height:1.45}
+.dossier-sources{font-size:12px;line-height:1.6;overflow-wrap:anywhere}
+.dossier-sources a{color:#a45b7d}
+.dossier-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:12px}
+.dossier-actions button{flex:1;min-width:120px}
+.dossier-current{background:#fff7fb;border-radius:11px;padding:9px;margin:7px 0;font-size:11px;line-height:1.5;color:#896b7e;white-space:pre-wrap;overflow-wrap:anywhere}
+.dossier-meta{background:#fff7fb;border-radius:13px;padding:10px;margin:8px 0;font-size:12px;line-height:1.5;color:#805b73;overflow-wrap:anywhere}
+.dossier-box button:disabled{opacity:.55;cursor:wait}
 </style>
 </head>
 <body>
@@ -1024,12 +1045,6 @@ typingChatId=chat.id;
 if(getChat()&&getChat().id===chat.id)renderChat();
 
 try{
-/*
-  Собираем анкеты участников.
-  Профили в localStorage хранятся по ключу:
-  "Имя персонажа|||Название произведения".
-  Сервер получает объект profiles, где ключ — имя персонажа.
-*/
 const profiles={};
 
 for(const name of chat.participants||[]){
@@ -1300,6 +1315,326 @@ content.innerHTML+=`
 <p class="note">Твои переписки, персонажи и избранное пока хранятся на этом устройстве. Подключение аккаунта само по себе не переносит их в облако.</p></div>`;
 renderAuthCard();
 };
+
+/* =====================================================
+   АВТОДОСЬЕ ПЕРСОНАЖЕЙ
+   Tavily ищет источники, Groq собирает анкету.
+   Черновик не сохраняется автоматически.
+===================================================== */
+
+const dossierFields=[
+{key:"description",title:"✧ Краткое описание",placeholder:"Кто этот персонаж?"},
+{key:"age",title:"🎂 Возраст",placeholder:"Возраст персонажа"},
+{key:"appearance",title:"🪞 Внешность",placeholder:"Внешность, одежда, особенности"},
+{key:"personality",title:"💗 Характер",placeholder:"Черты характера и поведение"},
+{key:"speech",title:"💬 Манера речи",placeholder:"Как разговаривает персонаж"},
+{key:"habits",title:"🌷 Привычки и особенности",placeholder:"Привычки, интересы и особенности"},
+{key:"backstory",title:"📖 Биография и история",placeholder:"Прошлое и важные события"}
+];
+
+let currentDossierDraft=null;
+let currentDossierIndex=null;
+let dossierRequestInProgress=false;
+
+function dossierText(value){
+if(value===null||value===undefined)return "";
+if(typeof value==="string")return value;
+if(typeof value==="number"||typeof value==="boolean")return String(value);
+try{return JSON.stringify(value,null,2)}catch(e){return String(value)}
+}
+
+function dossierSafeUrl(value){
+if(typeof value!=="string")return "";
+try{
+const url=new URL(value);
+if(url.protocol!=="https:"&&url.protocol!=="http:")return "";
+return url.href;
+}catch(e){return ""}
+}
+
+function dossierSourceLink(source,index){
+let url="",title="Источник "+(index+1);
+if(typeof source==="string"){
+url=dossierSafeUrl(source);
+title=url?url:"Источник "+(index+1);
+}else if(source&&typeof source==="object"){
+url=dossierSafeUrl(source.url||source.href||source.link);
+title=source.title||source.name||source.source||source.url||title;
+}
+if(!url){
+return `<div>• ${escapeHTML(title)}</div>`;
+}
+return `<div>• <a href="${escapeHTML(url)}" target="_blank" rel="noopener noreferrer">${escapeHTML(title)}</a></div>`;
+}
+
+function dossierFieldSourceText(value){
+if(!value)return "";
+if(Array.isArray(value)){
+return value.map(item=>{
+if(typeof item==="string")return item;
+return item?.title||item?.name||item?.url||"";
+}).filter(Boolean).join(" · ");
+}
+if(typeof value==="object"){
+return value.title||value.name||value.url||dossierText(value);
+}
+return String(value);
+}
+
+function dossierProfileCurrentValue(index,field){
+const character=characters[index];
+if(!character)return "";
+const profile=getCharacterProfile(character);
+const textarea=document.getElementById("profile-"+field);
+return textarea?textarea.value:(profile[field]||"");
+}
+
+function dossierAddPanel(index){
+const character=characters[index];
+if(!character)return;
+const panel=document.getElementById("panelContent");
+const hint=panel.querySelector(".profile-hint");
+if(!hint)return;
+
+const box=document.createElement("section");
+box.className="dossier-box";
+box.id="characterDossierBox";
+box.innerHTML=`
+<h3>✨ Заполнить досье с помощью ИИ</h3>
+<p class="note">ИИ поищет информацию в интернете, сверит найденные сведения и подготовит черновик анкеты. Ты сможешь всё проверить и отредактировать перед сохранением.</p>
+<label class="note" for="dossierName">Имя персонажа</label>
+<input class="field" id="dossierName" maxlength="120" value="${escapeHTML(character[0])}" placeholder="Имя персонажа">
+<label class="note" for="dossierWork">Произведение</label>
+<input class="field" id="dossierWork" maxlength="180" value="${escapeHTML(character[1])}" placeholder="Название произведения">
+<label class="note" for="dossierVersion">Версия, адаптация или часть</label>
+<input class="field" id="dossierVersion" maxlength="180" placeholder="Например: второй сезон, ремейк, конкретная ветка">
+<label class="note" for="dossierNotes">Дополнительные уточнения (необязательно)</label>
+<textarea class="field" id="dossierNotes" maxlength="1000" rows="3" placeholder="Например: нужна информация строго по событиям второй части, без спойлеров из продолжения."></textarea>
+<button class="primary dossier-search-button" id="dossierSearchButton" onclick="searchCharacterDossier(${index})">🔎 Найти информацию и составить досье</button>
+<div class="dossier-status" id="dossierStatus"></div>
+<div id="dossierDraftArea"></div>
+`;
+hint.insertAdjacentElement("afterend",box);
+}
+
+const originalOpenCharacterProfile=openCharacterProfile;
+openCharacterProfile=function(index){
+originalOpenCharacterProfile(index);
+if(currentDossierIndex!==index){
+currentDossierDraft=null;
+currentDossierIndex=null;
+}
+dossierAddPanel(index);
+if(currentDossierDraft&&currentDossierIndex===index){
+renderDossierDraft(index);
+}
+};
+
+async function searchCharacterDossier(index){
+const character=characters[index];
+if(!character)return;
+if(dossierRequestInProgress)return;
+
+const nameInput=document.getElementById("dossierName");
+const workInput=document.getElementById("dossierWork");
+const versionInput=document.getElementById("dossierVersion");
+const notesInput=document.getElementById("dossierNotes");
+const status=document.getElementById("dossierStatus");
+const button=document.getElementById("dossierSearchButton");
+
+if(!nameInput||!workInput||!status||!button)return;
+
+const name=nameInput.value.trim();
+const work=workInput.value.trim();
+const version=versionInput?.value.trim()||"";
+const notes=notesInput?.value.trim()||"";
+
+if(!name){status.textContent="Введи имя персонажа.";nameInput.focus();return}
+if(!work){status.textContent="Укажи произведение, чтобы ИИ не перепутал персонажа.";workInput.focus();return}
+
+if(currentDossierDraft&&currentDossierIndex===index){
+const accepted=confirm("Предыдущий черновик будет заменён новым поиском. Он ещё не сохранён в профиль. Продолжить?");
+if(!accepted)return;
+}
+
+dossierRequestInProgress=true;
+button.disabled=true;
+button.textContent="Ищем информацию...";
+status.textContent="Шаг 1 из 2: ищем сведения и источники в интернете. Это может занять некоторое время.";
+document.getElementById("dossierDraftArea").innerHTML="";
+
+try{
+const controller=new AbortController();
+const timeout=setTimeout(()=>controller.abort(),90000);
+let response;
+try{
+response=await fetch("/api/dossier",{
+method:"POST",
+headers:{"Content-Type":"application/json"},
+body:JSON.stringify({name,work,version,notes}),
+signal:controller.signal
+});
+}finally{
+clearTimeout(timeout);
+}
+
+let data={};
+try{data=await response.json()}
+catch(e){throw new Error("Сервер вернул некорректный ответ. Проверь api/dossier.js.")}
+
+if(!response.ok){
+throw new Error(data.error||"Не удалось составить досье. Проверь настройки сервера.");
+}
+
+if(!data.fields||typeof data.fields!=="object"){
+throw new Error("Сервер не вернул поля анкеты. Проверь версию api/dossier.js.");
+}
+
+currentDossierDraft=data;
+currentDossierIndex=index;
+
+status.textContent="Готово! Проверь найденную информацию, отредактируй черновик и отметь поля, которые хочешь перенести в профиль. ♡";
+renderDossierDraft(index);
+
+}catch(error){
+if(error.name==="AbortError"){
+status.textContent="Поиск занял слишком много времени. Попробуй ещё раз.";
+}else{
+status.textContent="Не удалось получить досье: "+(error.message||"неизвестная ошибка");
+}
+}finally{
+dossierRequestInProgress=false;
+const currentButton=document.getElementById("dossierSearchButton");
+if(currentButton){
+currentButton.disabled=false;
+currentButton.textContent="🔎 Найти информацию и составить досье";
+}
+}
+}
+
+function renderDossierDraft(index){
+const data=currentDossierDraft;
+if(!data||currentDossierIndex!==index)return;
+
+const area=document.getElementById("dossierDraftArea");
+if(!area)return;
+
+const identity=data.identity?dossierText(data.identity):"Не указано";
+const uncertainty=data.uncertainty?dossierText(data.uncertainty):"Не указано";
+const sources=Array.isArray(data.sources)?data.sources:[];
+const fieldSources=data.fieldSources&&typeof data.fieldSources==="object"?data.fieldSources:{};
+
+let html=`
+<div class="dossier-meta">
+<strong>Проверка личности персонажа</strong>
+<div style="margin-top:5px">${escapeHTML(identity)}</div>
+</div>
+<div class="dossier-meta">
+<strong>Неопределённость и спорные сведения</strong>
+<div style="margin-top:5px">${escapeHTML(uncertainty)}</div>
+</div>
+<p class="note">Каждое поле можно отредактировать. Галочки определяют, какие сведения будут перенесены в твою анкету.</p>
+`;
+
+dossierFields.forEach(field=>{
+const value=dossierText(data.fields?.[field.key]);
+const currentValue=dossierProfileCurrentValue(index,field.key);
+const alreadyFilled=Boolean(currentValue.trim());
+const sourceText=dossierFieldSourceText(fieldSources[field.key]);
+
+html+=`
+<div class="dossier-draft">
+<h4>${field.title}</h4>
+<textarea id="dossier-draft-${field.key}" placeholder="${escapeHTML(field.placeholder)}">${escapeHTML(value)}</textarea>
+${sourceText?`<div class="dossier-warning">Источник для этого поля: ${escapeHTML(sourceText)}</div>`:""}
+${alreadyFilled?`
+<div class="dossier-warning">В твоём профиле это поле уже заполнено. Оно не будет заменено, пока ты сама не отметишь галочку ниже.</div>
+<div class="dossier-current"><strong>Сейчас в профиле:</strong>\n${escapeHTML(currentValue.slice(0,700))}${currentValue.length>700?"…":""}</div>
+`:""}
+<label class="dossier-apply">
+<input type="checkbox" id="dossier-apply-${field.key}" ${alreadyFilled?"":"checked"}>
+<span>Применить это поле в моём профиле${alreadyFilled?" (заменить существующий текст)":""}</span>
+</label>
+</div>`;
+});
+
+html+=`
+<div class="dossier-draft">
+<h4>🔗 Источники поиска</h4>
+<div class="dossier-sources">
+${sources.length?sources.map((source,i)=>dossierSourceLink(source,i)).join(""):"Сервер не вернул отдельный список ссылок."}
+</div>
+</div>
+<div class="dossier-actions">
+<button class="primary" onclick="applyCharacterDossier(${index})">💗 Сохранить отмеченные поля</button>
+<button class="action" onclick="discardCharacterDossier(${index})">Отменить черновик</button>
+</div>
+<p class="dossier-warning">Важно: поиск сам по себе ничего не сохраняет. Существующие данные останутся нетронутыми, если ты не отметишь соответствующее поле.</p>
+`;
+
+area.innerHTML=html;
+}
+
+function applyCharacterDossier(index){
+const data=currentDossierDraft;
+const character=characters[index];
+if(!data||currentDossierIndex!==index||!character){
+showToast("Сначала составь черновик досье.");
+return;
+}
+
+const selected=dossierFields.filter(field=>{
+return document.getElementById("dossier-apply-"+field.key)?.checked;
+});
+
+if(!selected.length){
+showToast("Ты не отметила ни одного поля для сохранения.");
+return;
+}
+
+const profile=getCharacterProfile(character);
+
+/* Сначала сохраняем актуальные ручные изменения из открытой анкеты. */
+dossierFields.forEach(field=>{
+const input=document.getElementById("profile-"+field.key);
+if(input)profile[field.key]=input.value;
+});
+
+/* Переносим только явно отмеченные поля. */
+let applied=0;
+selected.forEach(field=>{
+const draftInput=document.getElementById("dossier-draft-"+field.key);
+if(!draftInput)return;
+profile[field.key]=draftInput.value.trim();
+applied++;
+});
+
+if(!applied){
+showToast("Не удалось прочитать отмеченные поля.");
+return;
+}
+
+try{
+saveCharacterProfiles();
+currentDossierDraft=null;
+currentDossierIndex=null;
+openCharacterProfile(index);
+showToast("Сохранено полей: "+applied+" ♡");
+}catch(error){
+showToast("Не удалось сохранить. Возможно, закончилось место в памяти браузера.");
+}
+}
+
+function discardCharacterDossier(index){
+if(currentDossierIndex!==index)return;
+if(!confirm("Отменить черновик? Он ещё не сохранён в профиль."))return;
+currentDossierDraft=null;
+currentDossierIndex=null;
+const area=document.getElementById("dossierDraftArea");
+const status=document.getElementById("dossierStatus");
+if(area)area.innerHTML="";
+if(status)status.textContent="Черновик отменён. Твоя анкета не изменилась.";
+}
 
 /* ===== КОНЕЦ ===== */
 </script>
