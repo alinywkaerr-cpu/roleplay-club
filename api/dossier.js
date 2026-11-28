@@ -248,7 +248,7 @@ ${sourceContext}
       });
     }
 
-    const fields = [
+    const profileFields = [
       "description",
       "age",
       "appearance",
@@ -260,7 +260,7 @@ ${sourceContext}
 
     const result = {};
 
-    for (const field of fields) {
+    for (const field of profileFields) {
       result[field] =
         typeof dossier[field] === "string"
           ? dossier[field].trim().slice(0, 7000)
@@ -273,7 +273,7 @@ ${sourceContext}
 
     const fieldSources = {};
 
-    for (const field of fields) {
+    for (const field of profileFields) {
       const ids = Array.isArray(dossier.fieldSources?.[field])
         ? dossier.fieldSources[field]
         : [];
@@ -298,14 +298,19 @@ ${sourceContext}
       work: characterWork,
       version: characterVersion,
       identity: clean(dossier.identity, 1500),
-      fields,
+
+      // Важно: возвращаем объект с семью полями анкеты
+      fields: result,
+
       fieldSources,
       uncertainty,
+
       sources: sources.map(source => ({
         id: source.id,
         title: source.title,
         url: source.url
       })),
+
       createdAt: new Date().toISOString()
     });
 
@@ -319,3 +324,4 @@ ${sourceContext}
     });
   }
 }
+
